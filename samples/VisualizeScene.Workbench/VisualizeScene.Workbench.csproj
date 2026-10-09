@@ -1,0 +1,18 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-desktop;net10.0-browserwasm</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+    <UnoFeatures>SkiaRenderer</UnoFeatures>
+    <ApplicationTitle>VisualizeScene</ApplicationTitle>
+    <ApplicationId>org.visualizescene.workbench</ApplicationId>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <WasmShellWebAppManifest>Platforms/WebAssembly/manifest.webmanifest</WasmShellWebAppManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/VisualizeScene.Controls.Uno/VisualizeScene.Controls.Uno.csproj" />
+    <ProjectReference Include="../../src/VisualizeScene.Layout/VisualizeScene.Layout.csproj" />
+    <ProjectReference Include="../../src/VisualizeScene.Serialization/VisualizeScene.Serialization.csproj" />
+  </ItemGroup>
+</Project>
