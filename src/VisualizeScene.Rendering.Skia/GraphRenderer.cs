@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using SkiaSharp;
 using SkiaSharp.HarfBuzz;
 using VisualizeScene.Core;
@@ -9,11 +10,7 @@ public sealed record RenderOptions(bool ShowGrid = true, double GridSize = 10, I
     RectD? Marquee = null, (PointD Start, PointD End)? EdgePreview = null, bool Overview = false);
 public sealed record RenderStatistics(int VisibleNodes, int VisibleEdges, int CachedNodePictures, double CpuDrawMilliseconds);
 
-/// <summary>
-/// Draws to the caller's Skia canvas, including Uno's shared GPU composition surface.
-/// No intermediate bitmap is allocated during interactive rendering. GPU availability belongs to the host.
-/// The renderer owns its native resources and must be disposed with its view.
-/// </summary>
+/// <summary>Draws directly to the caller's Skia canvas, including Uno's shared composition surface. Dispose with the view.</summary>
 public sealed class GraphRenderer : IDisposable
 {
     private sealed record NodePicture(GraphNode Style, SKPicture Picture);
@@ -44,8 +41,7 @@ public sealed class GraphRenderer : IDisposable
     {
         if (ReferenceEquals(graph, snapshot)) return;
         GraphValidation.Validate(snapshot); graph = snapshot; index = snapshot.Index();
-        order = snapshot.Nodes.Select((n, i) => (n.Id, i)).ToDictionary(p => p.Id, p => p.i);
-        depths = [];
+        order = snapshot.Nodes.Select((n, i) => (n.Id, i)).ToDictionary(p => p.Id, p => p.i); depths = [];
         foreach (var node in snapshot.Nodes)
         {
             var depth = 0; for (var parent = node.ParentId; parent is not null; parent = index.Nodes[parent].ParentId) depth++;
@@ -73,8 +69,7 @@ public sealed class GraphRenderer : IDisposable
         var save = canvas.Save();
         try
         {
-            canvas.ClipRect(SKRect.Create((float)width, (float)height));
-            canvas.Clear(SKColors.White);
+            canvas.ClipRect(SKRect.Create((float)width, (float)height)); canvas.Clear(SKColors.White);
             canvas.Scale((float)zoom); canvas.Translate((float)-origin.X, (float)-origin.Y);
             if (options.ShowGrid && !options.Overview) DrawGrid(canvas, view, zoom, options.GridSize);
             foreach (var node in visible.Where(n => n.IsGroup && !n.Collapsed).OrderBy(n => depths[n.Id])) DrawNode(canvas, node, zoom, options.Overview);
@@ -88,7 +83,7 @@ public sealed class GraphRenderer : IDisposable
                     if (!index!.IsVisible(port.NodeId) || !view.Contains(index.PortLocation(port.Id))) continue;
                     var p = index.PortLocation(port.Id); Use(SKColors.White); canvas.DrawCircle(Point(p), (float)(3.5 / zoom), paint); Use(new SKColor(56, 103, 151), SKPaintStyle.Stroke, (float)(1 / zoom)); canvas.DrawCircle(Point(p), (float)(3.5 / zoom), paint);
                 }
-                DrawSelection(canvas, snapshot, zoom, options);
+                DrawSelection(canvas, zoom, options);
             }
         }
         finally { canvas.RestoreToCount(save); }
@@ -138,9 +133,9 @@ public sealed class GraphRenderer : IDisposable
             if (style.IsGroup && !style.Collapsed)
             {
                 Use(new SKColor(221, 232, 243)); target.DrawRoundRect(new SKRect(1, 1, (float)style.Bounds.Width - 1, 28), 5, 5, paint);
-                DrawText(target, style.Text, new(style.Bounds.Width / 2, 14), 12, style.Bounds.Width - 34);
+                DrawText(target, style.Text, new(style.Bounds.Width / 2, 14), 12, Math.Max(0, style.Bounds.Width - 34));
             }
-            else DrawText(target, style.Text, style.Bounds.Center, 13, style.Bounds.Width * (style.Shape == NodeShape.Diamond ? .6 : .82), style.Bounds.Height - 10);
+            else DrawText(target, style.Text, style.Bounds.Center, 13, style.Bounds.Width * (style.Shape == NodeShape.Diamond ? .6 : .82), Math.Max(0, style.Bounds.Height - 10));
             if (style.IsGroup)
             {
                 Use(SKColor.Parse(style.Stroke), SKPaintStyle.Stroke, 1.2f); target.DrawRect(new SKRect(8, 8, 20, 20), paint); target.DrawLine(11, 14, 17, 14, paint); if (style.Collapsed) target.DrawLine(14, 11, 14, 17, paint);
@@ -149,9 +144,26 @@ public sealed class GraphRenderer : IDisposable
         }
         var save = canvas.Save(); canvas.Translate((float)node.Bounds.X, (float)node.Bounds.Y); canvas.DrawPicture(cached.Picture); canvas.RestoreToCount(save);
     }
+    /// <summary>Bounded grapheme-safe truncation. Even widths smaller than one glyph terminate immediately.</summary>
+    public static string Ellipsize(string text, double maxWidth, Func<string, double> measure)
+    {
+        ArgumentNullException.ThrowIfNull(text); ArgumentNullException.ThrowIfNull(measure);
+        if (maxWidth <= 0 || double.IsNaN(maxWidth)) return "";
+        if (measure(text) <= maxWidth) return text;
+        const string ellipsis = "…";
+        if (measure(ellipsis) > maxWidth) return "";
+        var starts = StringInfo.ParseCombiningCharacters(text); var low = 0; var high = starts.Length;
+        while (low < high)
+        {
+            var middle = (low + high + 1) / 2;
+            var end = middle == starts.Length ? text.Length : starts[middle];
+            if (measure(text[..end] + ellipsis) <= maxWidth) low = middle; else high = middle - 1;
+        }
+        return (low == 0 ? "" : text[..(low == starts.Length ? text.Length : starts[low])]) + ellipsis;
+    }
     private void DrawText(SKCanvas canvas, string text, PointD center, double size, double maxWidth = double.PositiveInfinity, double maxHeight = double.PositiveInfinity, bool background = false)
     {
-        if (string.IsNullOrEmpty(text)) return;
+        if (string.IsNullOrEmpty(text) || maxWidth <= 0 || maxHeight <= 0) return;
         using var font = new SKFont(typeface, (float)size) { Edging = SKFontEdging.Antialias, Subpixel = true };
         var lines = new List<string>();
         foreach (var paragraph in text.Replace("\r", "").Split('\n'))
@@ -170,23 +182,20 @@ public sealed class GraphRenderer : IDisposable
         var lineHeight = size * 1.25; var metrics = font.Metrics;
         for (var i = 0; i < lines.Count; i++)
         {
-            var line = lines[i];
-            while (line.Length > 1 && font.MeasureText(line) > maxWidth) line = line[..Math.Max(1, line.Length - (line.EndsWith('…') ? 2 : 1))] + "…";
+            var line = Ellipsize(lines[i], maxWidth, value => font.MeasureText(value));
             var baseline = center.Y + (i - (lines.Count - 1) / 2d) * lineHeight - (metrics.Ascent + metrics.Descent) / 2;
             if (background)
             {
                 var textWidth = font.MeasureText(line); Use(new SKColor(255, 255, 255, 238));
                 canvas.DrawRoundRect(new SKRect((float)(center.X - textWidth / 2 - 4), (float)(baseline + metrics.Ascent - 2), (float)(center.X + textWidth / 2 + 4), (float)(baseline + metrics.Descent + 2)), 3, 3, paint);
             }
-            Use(new SKColor(33, 56, 77));
-            canvas.DrawShapedText(shaper, line, (float)center.X, (float)baseline, SKTextAlign.Center, font, paint);
+            Use(new SKColor(33, 56, 77)); canvas.DrawShapedText(shaper, line, (float)center.X, (float)baseline, SKTextAlign.Center, font, paint);
         }
     }
     private void DrawEdge(SKCanvas canvas, EdgePicture edge, double zoom, RenderOptions options)
     {
         var selected = options.Selection?.Contains(edge.Edge.Id) == true;
-        Use(selected ? new SKColor(0, 112, 215) : SKColor.Parse(edge.Edge.Stroke), SKPaintStyle.Stroke, selected ? (float)(2.5 / zoom) : 1.5f);
-        canvas.DrawPath(edge.Path, paint);
+        Use(selected ? new SKColor(0, 112, 215) : SKColor.Parse(edge.Edge.Stroke), SKPaintStyle.Stroke, selected ? (float)(2.5 / zoom) : 1.5f); canvas.DrawPath(edge.Path, paint);
         if (edge.Edge.Directed && edge.Points.Count >= 2)
         {
             var end = edge.Points[^1]; var previous = edge.Points.Reverse().Skip(1).FirstOrDefault(p => PointD.Distance(p, end) > .001, edge.Points[0]); var delta = end - previous; var length = delta.Length;
@@ -211,11 +220,10 @@ public sealed class GraphRenderer : IDisposable
             else if (index.Ports.TryGetValue(label.OwnerId, out var port)) { if (!index.IsVisible(port.NodeId)) continue; center = index.PortLocation(port.Id); }
             else if (edges.TryGetValue(label.OwnerId, out var edge)) center = PointD.Lerp(edge.Points[0], edge.Points[^1], .5);
             else continue;
-            center += label.Offset;
-            if (view.Inflate(200).Contains(center)) DrawText(canvas, label.Text, center, label.FontSize, background: true);
+            center += label.Offset; if (view.Inflate(200).Contains(center)) DrawText(canvas, label.Text, center, label.FontSize, background: true);
         }
     }
-    private void DrawSelection(SKCanvas canvas, GraphSnapshot snapshot, double zoom, RenderOptions options)
+    private void DrawSelection(SKCanvas canvas, double zoom, RenderOptions options)
     {
         var accent = new SKColor(0, 112, 215); var handle = (float)(3.5 / zoom);
         void Handle(PointD center)
@@ -243,9 +251,11 @@ public sealed class GraphRenderer : IDisposable
     }
     public byte[] ExportPng(GraphSnapshot snapshot, double scale = 1)
     {
-        if (!double.IsFinite(scale) || scale <= 0) throw new ArgumentOutOfRangeException(nameof(scale));
-        var bounds = snapshot.Bounds.Inflate(40); var width = (int)Math.Ceiling(bounds.Width * scale); var height = (int)Math.Ceiling(bounds.Height * scale);
-        if (width < 1 || height < 1 || width > 16384 || height > 16384 || (long)width * height > 64000000) throw new InvalidOperationException("Raster export is limited to 64 million pixels and 16384 pixels per side. Use SVG for larger diagrams.");
+        if (!double.IsFinite(scale) || scale < .05 || scale > 8) throw new ArgumentOutOfRangeException(nameof(scale), "Export scale must be between 0.05 and 8.");
+        var bounds = snapshot.Bounds.Inflate(40); var pixelWidth = Math.Ceiling(bounds.Width * scale); var pixelHeight = Math.Ceiling(bounds.Height * scale);
+        if (!double.IsFinite(pixelWidth) || !double.IsFinite(pixelHeight) || pixelWidth < 1 || pixelHeight < 1 || pixelWidth > 16384 || pixelHeight > 16384 || pixelWidth * pixelHeight > 64000000)
+            throw new InvalidOperationException("Raster export is limited to 64 million pixels and 16384 pixels per side. Use SVG for larger diagrams.");
+        var width = (int)pixelWidth; var height = (int)pixelHeight;
         using var surface = SKSurface.Create(new SKImageInfo(width, height)) ?? throw new InvalidOperationException("Could not allocate export surface.");
         var viewport = new Viewport(); viewport.ZoomAt(new(), scale); viewport.Center(bounds.Center, width, height);
         Render(surface.Canvas, snapshot, viewport, width, height, new(ShowGrid: false));

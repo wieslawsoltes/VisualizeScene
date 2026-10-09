@@ -9,6 +9,7 @@
     <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <WasmShellWebAppManifest>Platforms/WebAssembly/manifest.webmanifest</WasmShellWebAppManifest>
+    <WasmShellWebAppBasePath>./</WasmShellWebAppBasePath>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/VisualizeScene.Controls.Uno/VisualizeScene.Controls.Uno.csproj" />

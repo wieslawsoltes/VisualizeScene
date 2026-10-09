@@ -30,7 +30,7 @@ public sealed class GraphControl : ContentControl, IDisposable
     }
     private readonly Surface surface;
     private readonly GraphRenderer renderer = new();
-    private bool disposed;
+    private bool disposed, releasingCapture;
     private GraphDocument document = new();
     public EditorSession Session { get; private set; }
     public RenderStatistics RenderStatistics => renderer.Statistics;
@@ -56,9 +56,10 @@ public sealed class GraphControl : ContentControl, IDisposable
         AutomationProperties.SetName(this, "Graph editor"); AutomationProperties.SetAutomationId(this, "GraphEditor");
         Session = new(document); surface = new Surface(this) { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
         Content = surface; Attach();
-        PointerPressed += Pressed; PointerMoved += Moved; PointerReleased += Released; PointerCanceled += (_, _) => Session.CancelGesture();
-        PointerCaptureLost += (_, _) => Session.CancelGesture(); PointerWheelChanged += Wheel;
-        DoubleTapped += DoubleTap; KeyDown += Key;
+        PointerPressed += Pressed; PointerMoved += Moved; PointerReleased += Released;
+        PointerCanceled += (_, _) => Session.CancelGesture();
+        PointerCaptureLost += (_, _) => { if (!releasingCapture && Session.Mode != EditorMode.CreateEdge) Session.CancelGesture(); };
+        PointerWheelChanged += Wheel; DoubleTapped += DoubleTap; KeyDown += Key;
         SizeChanged += (_, _) => Invalidate();
         RightTapped += (_, args) => { ContextMenu().ShowAt(this, args.GetPosition(this)); args.Handled = true; };
     }
@@ -80,13 +81,20 @@ public sealed class GraphControl : ContentControl, IDisposable
     {
         var point = args.GetCurrentPoint(this);
         if (point.Properties.IsRightButtonPressed) return;
-        Focus(FocusState.Pointer); CapturePointer(args.Pointer);
+        Focus(FocusState.Pointer);
+        // A two-click edge command spans separate pointer contacts. Capturing and releasing
+        // the first contact must not cancel the pending source endpoint.
+        if (Session.Mode != EditorMode.CreateEdge) CapturePointer(args.Pointer);
         Run(() => Session.PointerDown(Position(args), Modifiers(), point.Properties.IsMiddleButtonPressed)); args.Handled = true;
     }
     private void Moved(object sender, PointerRoutedEventArgs args) => Run(() => Session.PointerMove(Position(args)));
     private void Released(object sender, PointerRoutedEventArgs args)
     {
-        Run(() => Session.PointerUp(Position(args))); ReleasePointerCapture(args.Pointer); args.Handled = true;
+        Run(() => Session.PointerUp(Position(args)));
+        releasingCapture = true;
+        try { ReleasePointerCapture(args.Pointer); }
+        finally { releasingCapture = false; }
+        args.Handled = true;
     }
     private void Wheel(object sender, PointerRoutedEventArgs args)
     {
