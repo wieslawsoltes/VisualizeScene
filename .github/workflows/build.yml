@@ -1,0 +1,45 @@
+name: Build and validate
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build src/VisualizeScene.Core -c Release
+      - name: Run conformance
+        if: hashFiles('tests/VisualizeScene.Tests/VisualizeScene.Tests.csproj') != ''
+        run: dotnet run --project tests/VisualizeScene.Tests -c Release
+      - name: Build reusable packages
+        run: |
+          mkdir -p artifacts/packages
+          for project in src/*/*.csproj; do
+            case "$project" in *Controls.Uno*) continue;; esac
+            dotnet pack "$project" -c Release -o artifacts/packages
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/packages
+      - name: Source archive
+        run: mkdir -p artifacts/source && git archive HEAD -o artifacts/source/VisualizeScene-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source
+          path: artifacts/source
+  app:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Activated when the Uno host is committed.'
