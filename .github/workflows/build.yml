@@ -58,15 +58,15 @@ jobs:
       - name: Build desktop
         run: dotnet build samples/VisualizeScene.Workbench -c Release -f net10.0-desktop
       - name: Publish browser
-        run: dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-browserwasm -p:WasmShellBasePath=/VisualizeScene/ -o artifacts/browser-publish
+        run: dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-browserwasm -p:WasmShellWebAppBasePath=/VisualizeScene/ -o artifacts/browser-publish
       - name: Stage browser site
         run: |
-          find artifacts/browser-publish -maxdepth 5 -type f -name index.html
           index=$(find artifacts/browser-publish -type f -name index.html | head -n 1)
           test -n "$index"
           mkdir -p artifacts/site/VisualizeScene
           cp -a "$(dirname "$index")"/. artifacts/site/VisualizeScene/
           touch artifacts/site/VisualizeScene/.nojekyll
+          printf '{"commit":"%s","run":"%s","repository":"%s"}\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_REPOSITORY" > artifacts/site/VisualizeScene/build-info.json
       - uses: actions/upload-artifact@v4
         with:
           name: browser
@@ -84,8 +84,15 @@ jobs:
         run: |
           python -m http.server 8080 --directory artifacts/site >/tmp/visualizescene-http.log 2>&1 &
           python tests/browser/interaction.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Browser layouts, analysis, exports and samples
+        run: python tests/browser/features.py http://127.0.0.1:8080/VisualizeScene/?test=1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: browser-validation
           path: artifacts/browser-validation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-features
+          path: artifacts/browser-features
