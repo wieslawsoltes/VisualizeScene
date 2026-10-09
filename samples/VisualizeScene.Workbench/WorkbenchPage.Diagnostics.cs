@@ -1,0 +1,45 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using Microsoft.UI.Xaml;
+using VisualizeScene.Serialization;
+
+namespace VisualizeScene.Workbench;
+
+public sealed partial class WorkbenchPage
+{
+    private bool? diagnosticsEnabled;
+    private bool DiagnosticsEnabled
+    {
+        get
+        {
+#if __WASM__
+            return diagnosticsEnabled ??= Uno.Foundation.WebAssemblyRuntime.InvokeJS("new URLSearchParams(location.search).get('test') === '1' ? 'yes' : 'no'") == "yes";
+#else
+            return false;
+#endif
+        }
+    }
+    private void StartDiagnostics()
+    {
+        if (!DiagnosticsEnabled) return;
+        diagnosticTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) }; diagnosticTimer.Tick += (_, _) => PublishTestState(); diagnosticTimer.Start();
+    }
+    private void PublishTestState()
+    {
+#if __WASM__
+        if (!DiagnosticsEnabled) return;
+        static string Number(double value) => double.IsFinite(value) ? value.ToString("R", CultureInfo.InvariantCulture) : "0";
+        static string String(string value) => "\"" + JsonEncodedText.Encode(value).ToString() + "\"";
+        string Bounds(FrameworkElement element)
+        {
+            try { var p = element.TransformToVisual(this).TransformPoint(new Windows.Foundation.Point()); return $"{{\"x\":{Number(p.X)},\"y\":{Number(p.Y)},\"width\":{Number(element.ActualWidth)},\"height\":{Number(element.ActualHeight)}}}"; }
+            catch { return "null"; }
+        }
+        var model = GraphIO.ToJson(document.Snapshot); var controls = string.Join(",", testControls.Where(p => p.Value.IsLoaded).Select(p => String(p.Key) + ":" + Bounds(p.Value)));
+        var selected = string.Join(",", graph.Session.Selection.Select(String));
+        var script = $"globalThis.visualizeSceneState={{ready:{(ready ? "true" : "false")},frames:{frameCount},revision:{document.Revision},mode:'{graph.Session.Mode}',zoom:{Number(graph.Session.Viewport.Zoom)},origin:{{x:{Number(graph.Session.Viewport.Origin.X)},y:{Number(graph.Session.Viewport.Origin.Y)}}},canvas:{Bounds(graph)},controls:{{{controls}}},selection:[{selected}],error:{String(lastError)},analysis:{String(analysisOutput.Text)},status:{String(status.Text)},model:{model}}};";
+        Uno.Foundation.WebAssemblyRuntime.InvokeJS(script);
+#endif
+    }
+}

@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using VisualizeScene.Core;
 using VisualizeScene.Editing;
 
@@ -9,7 +10,7 @@ namespace VisualizeScene.Controls.Uno;
 
 public sealed record NodeTemplate(string Name, NodeShape Shape, string Fill, string Stroke, string Label);
 
-/// <summary>Reusable template palette; applications may replace the Items collection and handle TemplateSelected.</summary>
+/// <summary>Reusable template palette; applications may replace Items and handle TemplateSelected.</summary>
 public sealed class NodePalette : UserControl
 {
     private readonly StackPanel stack = new() { Spacing = 5 };
@@ -35,8 +36,15 @@ public sealed class NodePalette : UserControl
         {
             var button = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new(10, 7, 10, 7) };
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-            var swatch = new Border { Width = 34, Height = 24, CornerRadius = new(item.Shape == NodeShape.Ellipse ? 12 : 3), Background = Brush(item.Fill), BorderBrush = Brush(item.Stroke), BorderThickness = new(1) };
-            if (item.Shape == NodeShape.Diamond) { swatch.Width = swatch.Height = 21; swatch.RenderTransform = new RotateTransform { Angle = 45, CenterX = 10.5, CenterY = 10.5 }; }
+            Shape swatch = item.Shape switch
+            {
+                NodeShape.Ellipse => new Ellipse(),
+                NodeShape.Diamond => new Polygon { Points = new PointCollection { new(17, 0), new(34, 12), new(17, 24), new(0, 12) } },
+                NodeShape.Hexagon => new Polygon { Points = new PointCollection { new(8.5, 0), new(25.5, 0), new(34, 12), new(25.5, 24), new(8.5, 24), new(0, 12) } },
+                NodeShape.Parallelogram => new Polygon { Points = new PointCollection { new(7, 0), new(34, 0), new(27, 24), new(0, 24) } },
+                _ => new Rectangle { RadiusX = item.Shape == NodeShape.RoundedRectangle ? 4 : 0, RadiusY = item.Shape == NodeShape.RoundedRectangle ? 4 : 0 }
+            };
+            swatch.Width = 34; swatch.Height = 24; swatch.Fill = Brush(item.Fill); swatch.Stroke = Brush(item.Stroke); swatch.StrokeThickness = 1;
             row.Children.Add(swatch); row.Children.Add(new TextBlock { Text = item.Name, VerticalAlignment = VerticalAlignment.Center, FontSize = 12 }); button.Content = row;
             AutomationProperties.SetName(button, "Create " + item.Name); AutomationProperties.SetAutomationId(button, "Palette" + item.Shape);
             button.Click += (_, _) =>
