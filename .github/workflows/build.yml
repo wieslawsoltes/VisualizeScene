@@ -54,9 +54,9 @@ jobs:
       - name: Install WebAssembly workload
         run: dotnet workload install wasm-tools --skip-manifest-update
       - name: Build desktop
-        run: dotnet build samples/VisualizeScene.Workbench -c Release -f net10.0-desktop -p:TargetFrameworks=net10.0-desktop
+        run: dotnet build samples/VisualizeScene.Workbench -c Release -f net10.0-desktop
       - name: Publish browser
-        run: dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-browserwasm -p:TargetFrameworks=net10.0-browserwasm -p:WasmShellBasePath=/VisualizeScene/ -o artifacts/browser-publish
+        run: dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-browserwasm -p:WasmShellBasePath=/VisualizeScene/ -o artifacts/browser-publish
       - name: Stage browser site
         run: |
           find artifacts/browser-publish -maxdepth 5 -type f -name index.html
