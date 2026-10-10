@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Description>Versioned JSON, safe GraphML interchange and standalone SVG export.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../VisualizeScene.Core/VisualizeScene.Core.csproj" /></ItemGroup>
+</Project>

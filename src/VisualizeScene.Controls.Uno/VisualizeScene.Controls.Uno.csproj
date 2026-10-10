@@ -1,0 +1,16 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-desktop;net10.0-browserwasm</TargetFrameworks>
+    <TargetFrameworks Condition="'$(VisualizeSceneTargetFrameworks)' != ''">$(VisualizeSceneTargetFrameworks)</TargetFrameworks>
+    <OutputType>Library</OutputType>
+    <IsPackable>true</IsPackable>
+    <UnoSingleProject>true</UnoSingleProject>
+    <UnoFeatures>SkiaRenderer</UnoFeatures>
+    <Description>Reusable Uno Platform graph editor, overview, node palette and property inspector controls.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../VisualizeScene.Core/VisualizeScene.Core.csproj" />
+    <ProjectReference Include="../VisualizeScene.Editing/VisualizeScene.Editing.csproj" />
+    <ProjectReference Include="../VisualizeScene.Rendering.Skia/VisualizeScene.Rendering.Skia.csproj" />
+  </ItemGroup>
+</Project>

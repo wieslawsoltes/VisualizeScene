@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+artifacts/
+node_modules/
+.vs/
+.vscode/
+TestResults/
+*.user
+**/__pycache__/

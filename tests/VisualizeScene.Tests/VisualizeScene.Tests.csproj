@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/VisualizeScene.Core/VisualizeScene.Core.csproj" />
+    <ProjectReference Include="../../src/VisualizeScene.Algorithms/VisualizeScene.Algorithms.csproj" />
+    <ProjectReference Include="../../src/VisualizeScene.Layout/VisualizeScene.Layout.csproj" />
+    <ProjectReference Include="../../src/VisualizeScene.Serialization/VisualizeScene.Serialization.csproj" />
+    <ProjectReference Include="../../src/VisualizeScene.Editing/VisualizeScene.Editing.csproj" />
+  </ItemGroup>
+</Project>

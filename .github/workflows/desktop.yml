@@ -1,0 +1,38 @@
+name: Desktop packages
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish self-contained desktop app
+        run: dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-desktop -r ${{ matrix.rid }} --self-contained true -p:VisualizeSceneTargetFrameworks=net10.0-desktop -p:PublishSingleFile=true -o artifacts/desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.rid }}
+          path: artifacts/desktop
+      - name: Run portable contracts on native host
+        run: dotnet run --project tests/VisualizeScene.Tests -c Release

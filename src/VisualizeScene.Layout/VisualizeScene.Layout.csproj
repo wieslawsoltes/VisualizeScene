@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Description>Deterministic hierarchical, tree, radial, circular, organic and grid layouts with compound graph support.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../VisualizeScene.Core/VisualizeScene.Core.csproj" /><ProjectReference Include="../VisualizeScene.Algorithms/VisualizeScene.Algorithms.csproj" /></ItemGroup>
+</Project>

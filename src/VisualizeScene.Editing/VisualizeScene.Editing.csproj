@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Description>Platform-neutral graph editing sessions, selection, clipboard, input gestures, snapping and alignment.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../VisualizeScene.Core/VisualizeScene.Core.csproj" /></ItemGroup>
+</Project>
