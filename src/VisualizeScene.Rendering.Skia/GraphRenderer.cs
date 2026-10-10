@@ -6,7 +6,7 @@ using VisualizeScene.Core;
 namespace VisualizeScene.Rendering.Skia;
 
 public sealed record RenderOptions(bool ShowGrid = true, double GridSize = 10, IReadOnlySet<string>? Selection = null,
-    RectD? Marquee = null, (PointD Start, PointD End)? EdgePreview = null, bool Overview = false);
+    RectD? Marquee = null, (PointD Start, PointD End)? EdgePreview = null, bool Overview = false, PointD? CandidatePosition = null, bool IsValidConnection = true);
 public sealed record RenderStatistics(int VisibleNodes, int VisibleEdges, int CachedNodePictures, double CpuDrawMilliseconds);
 
 /// <summary>Draws directly to the caller's Skia canvas, including Uno's shared composition surface. Dispose with the view.</summary>

@@ -102,9 +102,29 @@ public sealed partial class GraphRenderer
             {
                 var b = node.Bounds; Use(accent, SKPaintStyle.Stroke, (float)(1.6 / zoom)); canvas.DrawRect(Rect(b.Inflate(2 / zoom)), paint); if (!node.Locked) { Handle(new(b.X, b.Y)); Handle(new(b.Right, b.Y)); Handle(new(b.Right, b.Bottom)); Handle(new(b.X, b.Bottom)); }
             }
-            else if (index!.Edges.TryGetValue(id, out var edge) && !edge.Bends.IsDefault) foreach (var bend in edge.Bends) Handle(bend);
+            else if (index!.Ports.TryGetValue(id, out var port) && index.IsVisible(port.NodeId))
+            {
+                var center = index.PortLocation(id); Use(accent, SKPaintStyle.Stroke, (float)(2 / zoom));
+                canvas.DrawCircle(Point(center), (float)(6 / zoom), paint);
+            }
+            else if (index!.Edges.TryGetValue(id, out var edge) && edges.TryGetValue(id, out var picture))
+            {
+                if (!edge.Bends.IsDefault) foreach (var bend in edge.Bends) Handle(bend);
+                void Endpoint(PointD point, string nodeId)
+                {
+                    if (!index.IsVisible(nodeId) || index.Nodes[nodeId].Locked) return;
+                    Use(SKColors.White); canvas.DrawCircle(Point(point), (float)(4.5 / zoom), paint);
+                    Use(accent, SKPaintStyle.Stroke, (float)(1.5 / zoom)); canvas.DrawCircle(Point(point), (float)(4.5 / zoom), paint);
+                }
+                Endpoint(picture.Points[0], edge.SourceId); Endpoint(picture.Points[^1], edge.TargetId);
+            }
         }
         if (options.Marquee is { } marquee) { Use(new SKColor(0, 112, 215, 24)); canvas.DrawRect(Rect(marquee), paint); Use(accent, SKPaintStyle.Stroke, (float)(1 / zoom)); canvas.DrawRect(Rect(marquee), paint); }
-        if (options.EdgePreview is { } preview) { Use(accent, SKPaintStyle.Stroke, (float)(1.5 / zoom)); canvas.DrawLine(Point(preview.Start), Point(preview.End), paint); Use(accent); canvas.DrawCircle(Point(preview.End), (float)(4 / zoom), paint); }
+        var connectionColor = options.IsValidConnection ? new SKColor(34, 142, 84) : new SKColor(196, 48, 48);
+        if (options.EdgePreview is { } preview) { Use(connectionColor, SKPaintStyle.Stroke, (float)(1.5 / zoom)); canvas.DrawLine(Point(preview.Start), Point(preview.End), paint); Use(connectionColor); canvas.DrawCircle(Point(preview.End), (float)(4 / zoom), paint); }
+        if (options.CandidatePosition is { } candidate)
+        {
+            Use(connectionColor, SKPaintStyle.Stroke, (float)(2 / zoom)); canvas.DrawCircle(Point(candidate), (float)(8 / zoom), paint);
+        }
     }
 }

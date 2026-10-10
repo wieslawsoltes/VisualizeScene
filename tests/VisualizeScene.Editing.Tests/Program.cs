@@ -66,6 +66,8 @@ Test("Stale drag is canceled without overwrite", () =>
     Check(d.Snapshot.Nodes[0].Bounds.X == 0 && d.Snapshot.Nodes[0].Text == "remote");
 });
 
+ConnectionTests.Run(Test);
+
 Directory.CreateDirectory("artifacts/validation");
 var failures = results.Count(r => r.Error is not null);
 File.WriteAllText("artifacts/validation/editing.xml", new XElement("testsuite", new XAttribute("name", "Editing regressions"),

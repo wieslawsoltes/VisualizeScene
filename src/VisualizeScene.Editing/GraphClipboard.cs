@@ -8,6 +8,7 @@ public static class GraphClipboard
     public static GraphSnapshot Copy(GraphSnapshot graph, IEnumerable<string> selection)
     {
         var index = graph.Index(); var selected = selection.ToHashSet(); var nodes = selected.Where(index.Nodes.ContainsKey).ToHashSet();
+        foreach (var port in graph.Ports.Where(p => selected.Contains(p.Id))) nodes.Add(port.NodeId);
         foreach (var id in nodes.ToArray()) nodes.UnionWith(index.Descendants(id).Select(n => n.Id));
         foreach (var e in graph.Edges.Where(e => selected.Contains(e.Id))) { nodes.Add(e.SourceId); nodes.Add(e.TargetId); }
         var edges = graph.Edges.Where(e => nodes.Contains(e.SourceId) && nodes.Contains(e.TargetId)).ToImmutableArray();

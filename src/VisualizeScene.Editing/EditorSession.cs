@@ -6,11 +6,11 @@ namespace VisualizeScene.Editing;
 public enum EditorMode { Select, CreateNode, CreateEdge, Pan }
 public enum Alignment { Left, HorizontalCenter, Right, Top, VerticalCenter, Bottom, DistributeHorizontal, DistributeVertical }
 [Flags] public enum InputModifiers { None = 0, Shift = 1, Control = 2, Alt = 4 }
-public enum HitKind { None, Node, Edge, Port, ResizeHandle, Bend }
+public enum HitKind { None, Node, Edge, Port, ResizeHandle, Bend, SourceHandle, TargetHandle }
 public sealed record HitResult(HitKind Kind, string? Id = null, int Part = -1);
 
 /// <summary>Input/command state shared by desktop, browser and headless tests. A gesture commits one history entry.</summary>
-public sealed class EditorSession : IDisposable
+public sealed partial class EditorSession : IDisposable
 {
     private readonly HashSet<string> selection = [];
     private GraphIndex index;
@@ -22,14 +22,19 @@ public sealed class EditorSession : IDisposable
     private PointD start, last;
     private HitResult? drag;
     private InputModifiers modifiers;
-    private bool panning;
+    private bool panning, collapseSelectionOnClick, gestureHasMoved;
     private long startRevision;
     private string? sourceNode, sourcePort;
     public GraphDocument Document { get; }
     public GraphSnapshot DisplayGraph => preview ?? Document.Snapshot;
     public Viewport Viewport { get; } = new();
     public IReadOnlySet<string> Selection => selection;
-    public EditorMode Mode { get; set; }
+    private EditorMode mode;
+    public EditorMode Mode
+    {
+        get => mode;
+        set { if (!Enum.IsDefined(value)) throw new ArgumentOutOfRangeException(nameof(value)); if (mode == value) return; CancelGesture(false); mode = value; Invalidate(); }
+    }
     public NodeShape DefaultShape { get; set; } = NodeShape.RoundedRectangle;
     public string DefaultFill { get; set; } = "#DDEBFA";
     public string DefaultStroke { get; set; } = "#4778A5";
@@ -51,7 +56,7 @@ public sealed class EditorSession : IDisposable
     private void DocumentChanged(object? sender, GraphChangedEventArgs args)
     {
         CancelGesture(false); Reindex();
-        var changed = selection.RemoveWhere(id => !index.Nodes.ContainsKey(id) && !index.Edges.ContainsKey(id)) > 0;
+        var changed = selection.RemoveWhere(id => !index.Nodes.ContainsKey(id) && !index.Edges.ContainsKey(id) && !index.Ports.ContainsKey(id)) > 0;
         if (changed) SelectionChanged?.Invoke(this, EventArgs.Empty);
         StatusChanged?.Invoke(this, args.Operation); Invalidate();
     }
@@ -66,10 +71,10 @@ public sealed class EditorSession : IDisposable
     public void Select(IEnumerable<string> ids, bool additive = false)
     {
         if (!additive) selection.Clear();
-        foreach (var id in ids) if (index.Nodes.ContainsKey(id) || index.Edges.ContainsKey(id)) selection.Add(id);
+        foreach (var id in ids) if (index.Nodes.ContainsKey(id) || index.Edges.ContainsKey(id) || index.Ports.ContainsKey(id)) selection.Add(id);
         SelectionChanged?.Invoke(this, EventArgs.Empty); Invalidate();
     }
-    public void SelectAll() => Select(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => n.Id).Concat(Document.Snapshot.Edges.Select(e => e.Id)));
+    public void SelectAll() => Select(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => n.Id).Concat(paths.Keys));
     public PointD Snap(PointD point)
     {
         if (!SnapToGrid) return point;
@@ -88,8 +93,13 @@ public sealed class EditorSession : IDisposable
                     var b = node.Bounds; PointD[] points = [new(b.X, b.Y), new(b.Right, b.Y), new(b.Right, b.Bottom), new(b.X, b.Bottom)];
                     for (var i = 0; i < points.Length; i++) if (PointD.Distance(world, points[i]) <= tolerance) return new(HitKind.ResizeHandle, id, i);
                 }
-                if (index.Edges.TryGetValue(id, out var edge) && !edge.Bends.IsDefault)
-                    for (var i = 0; i < edge.Bends.Length; i++) if (PointD.Distance(world, edge.Bends[i]) <= tolerance) return new(HitKind.Bend, id, i);
+                if (index.Edges.TryGetValue(id, out var edge) && paths.TryGetValue(id, out var path))
+                {
+                    if (index.IsVisible(edge.SourceId) && !index.Nodes[edge.SourceId].Locked && PointD.Distance(world, path[0]) <= tolerance) return new(HitKind.SourceHandle, id);
+                    if (index.IsVisible(edge.TargetId) && !index.Nodes[edge.TargetId].Locked && PointD.Distance(world, path[^1]) <= tolerance) return new(HitKind.TargetHandle, id);
+                    if (!edge.Bends.IsDefault)
+                        for (var i = 0; i < edge.Bends.Length; i++) if (PointD.Distance(world, edge.Bends[i]) <= tolerance) return new(HitKind.Bend, id, i);
+                }
             }
         }
         foreach (var p in Document.Snapshot.Ports) if (index.IsVisible(p.NodeId) && PointD.Distance(world, index.PortLocation(p.Id)) < tolerance) return new(HitKind.Port, p.Id);
@@ -114,35 +124,20 @@ public sealed class EditorSession : IDisposable
     public void PointerDown(PointD screen, InputModifiers keys = InputModifiers.None, bool middleButton = false)
     {
         start = last = screen; modifiers = keys; startRevision = Document.Revision; preview = null;
+        collapseSelectionOnClick = gestureHasMoved = false; drag = null;
         panning = middleButton || Mode == EditorMode.Pan || keys.HasFlag(InputModifiers.Alt);
         if (panning) return;
         var world = Viewport.ToWorld(screen); var hit = Hit(world);
         if (Mode == EditorMode.CreateNode) { AddNode(world); return; }
-        if (Mode == EditorMode.CreateEdge)
-        {
-            var nodeId = hit.Kind == HitKind.Node ? hit.Id : hit.Kind == HitKind.Port ? index.Ports[hit.Id!].NodeId : null;
-            if (nodeId is null) { sourceNode = sourcePort = null; EdgePreview = null; Invalidate(); return; }
-            if (sourceNode is null)
-            {
-                sourceNode = nodeId; sourcePort = hit.Kind == HitKind.Port ? hit.Id : null;
-                EdgePreview = (sourcePort is null ? index.Nodes[sourceNode].Bounds.Center : index.PortLocation(sourcePort), world); Invalidate();
-            }
-            else
-            {
-                var from = sourceNode; var fromPort = sourcePort; var toPort = hit.Kind == HitKind.Port ? hit.Id : null;
-                sourceNode = sourcePort = null; EdgePreview = null;
-                var edgeId = GraphEdit.NewId("e"); Document.Edit("Create edge", e => e.Add(new GraphEdge(edgeId, from, nodeId, Bends: [], SourcePortId: fromPort, TargetPortId: toPort))); Select([edgeId]);
-            }
-            return;
-        }
-        if (hit.Kind == HitKind.Port) hit = new(HitKind.Node, index.Ports[hit.Id!].NodeId);
-        if (hit.Kind is HitKind.Node or HitKind.Edge)
+        if (Mode == EditorMode.CreateEdge) { CreateEdgeContact(world); return; }
+        if (hit.Kind is HitKind.Node or HitKind.Edge or HitKind.Port)
         {
             if (keys.HasFlag(InputModifiers.Control) || keys.HasFlag(InputModifiers.Shift))
             {
                 if (!selection.Remove(hit.Id!)) selection.Add(hit.Id!); SelectionChanged?.Invoke(this, EventArgs.Empty); Invalidate();
             }
             else if (!selection.Contains(hit.Id!)) Select([hit.Id!]);
+            else collapseSelectionOnClick = selection.Count > 1;
         }
         else if (hit.Kind == HitKind.None && !keys.HasFlag(InputModifiers.Shift) && !keys.HasFlag(InputModifiers.Control)) Select([]);
         drag = hit;
@@ -151,12 +146,27 @@ public sealed class EditorSession : IDisposable
     {
         if (panning) { Viewport.Pan(screen - last); last = screen; Invalidate(); return; }
         var world = Viewport.ToWorld(screen);
-        if (sourceNode is not null) { EdgePreview = (EdgePreview!.Value.Start, world); Invalidate(); return; }
-        if (drag is null || PointD.Distance(start, screen) < 2) return;
+        if (sourceNode is not null) { PreviewConnection(world); return; }
+        if (drag is null) return;
         if (Document.Revision != startRevision) { CancelGesture(); return; }
+        if (PointD.Distance(start, screen) < 2)
+        {
+            preview = null; Marquee = null; EdgePreview = null; ConnectionCandidate = null; CandidatePosition = null;
+            CandidateDecision = ConnectionDecision.Accept; Invalidate(); return;
+        }
+        gestureHasMoved = true;
         if (drag.Kind == HitKind.None) { Marquee = RectD.FromPoints(Viewport.ToWorld(start), world); Invalidate(); return; }
+        if (drag.Kind is HitKind.SourceHandle or HitKind.TargetHandle)
+        {
+            PreviewConnection(world, index.Edges[drag.Id!], drag.Kind == HitKind.SourceHandle ? EdgeEnd.Source : EdgeEnd.Target); return;
+        }
         var edit = new GraphEdit(Document.Snapshot);
-        if (drag.Kind == HitKind.Node)
+        if (drag.Kind == HitKind.Port)
+        {
+            var port = index.Ports[drag.Id!]; if (!CanMovePort(port)) return;
+            edit.Update(port with { RelativeLocation = RelativePortLocation(index.Nodes[port.NodeId], Snap(world)) });
+        }
+        else if (drag.Kind == HitKind.Node)
         {
             var original = index.Nodes[drag.Id!]; if (original.Locked) return;
             var delta = (screen - start) * (1 / Viewport.Zoom);
@@ -182,16 +192,24 @@ public sealed class EditorSession : IDisposable
         if (panning) { panning = false; return; }
         if (drag is null) return;
         PointerMove(screen);
-        var next = preview; var operation = drag.Kind == HitKind.ResizeHandle ? "Resize node" : drag.Kind == HitKind.Bend ? "Move bend" : "Move nodes";
+        if (drag is null) return; // A reentrant document change may have canceled the gesture.
+        var clicked = collapseSelectionOnClick && !gestureHasMoved ? drag.Id : null;
+        var next = preview;
+        var operation = drag.Kind switch
+        {
+            HitKind.ResizeHandle => "Resize node", HitKind.Bend => "Move bend", HitKind.Port => "Move port",
+            HitKind.SourceHandle => "Reconnect source", HitKind.TargetHandle => "Reconnect target", _ => "Move nodes"
+        };
         var rectangle = Marquee; var additive = modifiers.HasFlag(InputModifiers.Control) || modifiers.HasFlag(InputModifiers.Shift);
-        preview = null; drag = null; Marquee = null;
+        preview = null; drag = null; Marquee = null; EdgePreview = null; ConnectionCandidate = null; CandidatePosition = null; CandidateDecision = ConnectionDecision.Accept;
         if (next is not null && startRevision == Document.Revision) Document.Replace(next, operation);
+        if (clicked is not null) Select([clicked]);
         if (rectangle.HasValue) Select(nodeIndex.Query(rectangle.Value).Where(id => !index.Nodes[id].IsGroup), additive);
         Invalidate();
     }
     public void CancelGesture(bool invalidate = true)
     {
-        preview = null; drag = null; panning = false; Marquee = null; sourceNode = sourcePort = null; EdgePreview = null;
+        preview = null; drag = null; panning = collapseSelectionOnClick = gestureHasMoved = false; Marquee = null; sourceNode = sourcePort = null; EdgePreview = null; ConnectionCandidate = null; CandidatePosition = null; CandidateDecision = ConnectionDecision.Accept;
         if (invalidate) Invalidate();
     }
     public void DeleteSelection()

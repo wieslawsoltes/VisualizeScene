@@ -6,3 +6,4 @@ node_modules/
 .vscode/
 TestResults/
 *.user
+**/__pycache__/
