@@ -38,7 +38,9 @@ public sealed partial class WorkbenchPage
         }
         var model = GraphIO.ToJson(document.Snapshot); var controls = string.Join(",", testControls.Where(p => p.Value.IsLoaded).Select(p => String(p.Key) + ":" + Bounds(p.Value)));
         var selected = string.Join(",", graph.Session.Selection.Select(String));
-        var script = $"globalThis.visualizeSceneState={{ready:{(ready ? "true" : "false")},frames:{frameCount},revision:{document.Revision},mode:'{graph.Session.Mode}',zoom:{Number(graph.Session.Viewport.Zoom)},origin:{{x:{Number(graph.Session.Viewport.Origin.X)},y:{Number(graph.Session.Viewport.Origin.Y)}}},canvas:{Bounds(graph)},controls:{{{controls}}},selection:[{selected}],error:{String(lastError)},analysis:{String(analysisOutput.Text)},status:{String(status.Text)},model:{model}}};";
+        var index = document.Snapshot.Index();
+        var paths = string.Join(",", document.Snapshot.Edges.Select(e => String(e.Id) + ":[" + string.Join(",", index.EdgePath(e).Select(p => $"{{\"x\":{Number(p.X)},\"y\":{Number(p.Y)}}}")) + "]"));
+        var script = $"globalThis.visualizeSceneState={{ready:{(ready ? "true" : "false")},frames:{frameCount},revision:{document.Revision},mode:'{graph.Session.Mode}',zoom:{Number(graph.Session.Viewport.Zoom)},origin:{{x:{Number(graph.Session.Viewport.Origin.X)},y:{Number(graph.Session.Viewport.Origin.Y)}}},canvas:{Bounds(graph)},controls:{{{controls}}},selection:[{selected}],edgePaths:{{{paths}}},error:{String(lastError)},analysis:{String(analysisOutput.Text)},status:{String(status.Text)},model:{model}}};";
         Uno.Foundation.WebAssemblyRuntime.InvokeJS(script);
 #endif
     }

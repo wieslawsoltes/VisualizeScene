@@ -32,7 +32,7 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     public void Refresh()
     {
         fields.Children.Clear(); message.Text = "";
-        if (target is null || target.Session.Selection.Count == 0) { title.Text = "Nothing selected"; message.Text = "Select a node or edge to inspect its properties. Changes are undoable."; return; }
+        if (target is null || target.Session.Selection.Count == 0) { title.Text = "Nothing selected"; message.Text = "Select a node, edge or port to inspect its properties. Changes are undoable."; return; }
         var ids = target.Session.Selection.ToArray(); title.Text = ids.Length == 1 ? "Item properties" : $"{ids.Length} items selected";
         if (ids.Length > 1) { message.Text = "Use the alignment and grouping commands for multiple items."; return; }
         var index = target.Document.Snapshot.Index(); var id = ids[0];
@@ -59,6 +59,21 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
             Apply(() => { var current = target.Document.Snapshot.Index().Edges[id]; target.Document.Edit("Edit edge properties", edit => edit.Update(current with { Text = label.Text, Weight = N(weight), Stroke = stroke.Text, Routing = (EdgeRouting)routing.SelectedItem, Directed = directed.IsChecked == true })); });
             var clear = new Button { Content = "Clear bends", HorizontalAlignment = HorizontalAlignment.Stretch }; clear.Click += (_, _) => target.Document.Edit("Clear edge bends", edit => edit.Update(edit.Edge(id) with { Bends = [] })); fields.Children.Add(clear);
         }
+        else if (index.Ports.TryGetValue(id, out var port))
+        {
+            fields.Children.Add(new TextBlock { Text = "Owner: " + port.NodeId, FontSize = 11 });
+            var x = Text("Relative X · 0 to 1", F(port.RelativeLocation.X));
+            var y = Text("Relative Y · 0 to 1", F(port.RelativeLocation.Y));
+            Apply(() =>
+            {
+                var rx = N(x); var ry = N(y);
+                if (!double.IsFinite(rx) || !double.IsFinite(ry) || rx < 0 || rx > 1 || ry < 0 || ry > 1)
+                    throw new ArgumentException("Relative port coordinates must be between 0 and 1.");
+                var node = target.Document.Snapshot.Index().Nodes[port.NodeId];
+                target.Session.MovePort(id, new(node.Bounds.X + rx * node.Bounds.Width, node.Bounds.Y + ry * node.Bounds.Height));
+            });
+            message.Text = "Drag the port to relocate attached edges. Delete detaches its endpoints and remains undoable.";
+        }
     }
     private void Apply(Action action)
     {
@@ -67,5 +82,5 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     }
     private static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
     private static double N(TextBox input) => double.Parse(input.Text, NumberStyles.Float, CultureInfo.InvariantCulture);
-    public void Dispose() => Target = null;
+    public new void Dispose() => Target = null;
 }

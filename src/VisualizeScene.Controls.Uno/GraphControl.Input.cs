@@ -126,7 +126,14 @@ public sealed partial class GraphControl
     {
         var menu = new MenuFlyout();
         void Item(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => Run(action); menu.Items.Add(item); }
-        Item("Edit label  F2", () => _ = EditLabelAsync()); Item("Duplicate  Ctrl+D", Session.Duplicate); Item("Delete  Del", Session.DeleteSelection);
+        Item("Edit label  F2", () => _ = EditLabelAsync());
+        Item("Add port", () =>
+        {
+            var index = Document.Snapshot.Index(); var id = Session.Selection.FirstOrDefault(index.Nodes.ContainsKey);
+            if (id is null) return;
+            var node = index.Nodes[id]; Session.AddPort(id, new(node.Bounds.Right, node.Bounds.Center.Y));
+        });
+        Item("Duplicate  Ctrl+D", Session.Duplicate); Item("Delete  Del", Session.DeleteSelection);
         menu.Items.Add(new MenuFlyoutSeparator()); Item("Group  Ctrl+G", Session.Group); Item("Ungroup  Ctrl+Shift+G", Session.Ungroup);
         Item("Fold / unfold", () => { foreach (var id in Session.Selection.ToArray()) if (Document.Snapshot.Index().Nodes.TryGetValue(id, out var n) && n.IsGroup) Session.ToggleGroup(id); });
         menu.Items.Add(new MenuFlyoutSeparator()); Item("Fit graph  Home", Fit); return menu;

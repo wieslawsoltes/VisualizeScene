@@ -29,6 +29,12 @@ public sealed partial class WorkbenchPage
         file.Items.Add(new MenuFlyoutSeparator()); Item(file, "Save JSON…", () => _ = Save("json"), "SaveJson"); Item(file, "Save GraphML…", () => _ = Save("graphml"), "SaveGraphML"); Item(file, "Export SVG…", () => _ = Save("svg"), "ExportSvg"); Item(file, "Export PNG…", () => _ = Save("png"), "ExportPng"); Item(file, "View document source…", () => _ = TextExchange(false), "ViewSource");
         var edit = Menu("Edit"); Item(edit, "Undo  Ctrl+Z", document.Undo); Item(edit, "Redo  Ctrl+Y", document.Redo); edit.Items.Add(new MenuFlyoutSeparator());
         Item(edit, "Copy  Ctrl+C", () => graph.Session.Copy()); Item(edit, "Paste  Ctrl+V", () => graph.Session.Paste()); Item(edit, "Duplicate  Ctrl+D", graph.Session.Duplicate); Item(edit, "Delete  Del", graph.Session.DeleteSelection); Item(edit, "Select all  Ctrl+A", graph.Session.SelectAll); Item(edit, "Edit label  F2", () => _ = graph.EditLabelAsync());
+        Item(edit, "Add port to selected node", () =>
+        {
+            var index = document.Snapshot.Index(); var id = graph.Session.Selection.FirstOrDefault(index.Nodes.ContainsKey);
+            if (id is null) { status.Text = "Select a node first."; return; }
+            var node = index.Nodes[id]; graph.Session.AddPort(id, new(node.Bounds.Right, node.Bounds.Center.Y));
+        }, "AddPort");
         var view = Menu("View"); Item(view, "Fit graph  Home", graph.Fit); Item(view, "Zoom in", () => graph.Zoom(1.25)); Item(view, "Zoom out", () => graph.Zoom(.8)); Item(view, "Toggle grid", () => { graph.Session.ShowGrid = !graph.Session.ShowGrid; graph.Invalidate(); }); Item(view, "Toggle snapping", () => graph.Session.SnapToGrid = !graph.Session.SnapToGrid);
         var arrange = Menu("Arrange"); Item(arrange, "Group  Ctrl+G", graph.Session.Group); Item(arrange, "Ungroup  Ctrl+Shift+G", graph.Session.Ungroup); Item(arrange, "Fold / unfold selected groups", FoldSelected);
         arrange.Items.Add(new MenuFlyoutSeparator()); foreach (var alignment in Enum.GetValues<Alignment>()) Item(arrange, alignment.ToString(), () => graph.Session.Align(alignment));
