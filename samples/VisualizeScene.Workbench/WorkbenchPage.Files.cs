@@ -12,7 +12,7 @@ public sealed partial class WorkbenchPage
 {
     private async Task OpenFile()
     {
-        var picker = new FileOpenPicker(); picker.FileTypeFilter.Add(".json"); picker.FileTypeFilter.Add(".graphml"); picker.FileTypeFilter.Add(".xml");
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary }; picker.FileTypeFilter.Add(".json"); picker.FileTypeFilter.Add(".graphml"); picker.FileTypeFilter.Add(".xml");
         var file = await picker.PickSingleFileAsync(); if (file is null) return; var text = await FileIO.ReadTextAsync(file); if (!await ConfirmDiscard()) return; Import(text); currentName = file.Name; dirty = false;
     }
     private void Import(string text)
@@ -24,13 +24,13 @@ public sealed partial class WorkbenchPage
     {
         await RunAsync(async () =>
         {
-            var bytes = extension switch { "png" => graph.ExportPng(), "svg" => Encoding.UTF8.GetBytes(SvgExporter.Export(document.Snapshot)), "graphml" => Encoding.UTF8.GetBytes(GraphIO.ToGraphML(document.Snapshot)), _ => Encoding.UTF8.GetBytes(GraphIO.ToJson(document.Snapshot)) };
+            var bytes = extension switch { "png" => graph.ExportPng(), "svg" => Encoding.UTF8.GetBytes(SvgExporter.Export(document.Snapshot, graph.MeasureLabel)), "graphml" => Encoding.UTF8.GetBytes(GraphIO.ToGraphML(document.Snapshot)), _ => Encoding.UTF8.GetBytes(GraphIO.ToJson(document.Snapshot)) };
             var name = "visualizescene." + extension;
 #if __WASM__
             var mime = extension switch { "png" => "image/png", "svg" => "image/svg+xml", "graphml" => "application/graphml+xml", _ => "application/json" };
             Uno.Foundation.WebAssemblyRuntime.InvokeJS("(()=>{const raw=atob('" + Convert.ToBase64String(bytes) + "');const data=Uint8Array.from(raw,c=>c.charCodeAt(0));const url=URL.createObjectURL(new Blob([data],{type:'" + mime + "'}));const a=document.createElement('a');a.href=url;a.download='" + name + "';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);})()"); await Task.CompletedTask;
 #else
-            var picker = new FileSavePicker { SuggestedFileName = "visualizescene" }; picker.FileTypeChoices.Add(extension.ToUpperInvariant(), ["." + extension]);
+            var picker = new FileSavePicker { SuggestedFileName = "visualizescene", SuggestedStartLocation = PickerLocationId.DocumentsLibrary }; picker.FileTypeChoices.Add(extension.ToUpperInvariant(), ["." + extension]);
             var file = await picker.PickSaveFileAsync(); if (file is null) return; await FileIO.WriteBytesAsync(file, bytes);
 #endif
             if (extension is "json" or "graphml") dirty = false; status.Text = "Saved " + name;

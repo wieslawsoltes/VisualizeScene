@@ -19,6 +19,7 @@ public sealed partial class GraphControl
         if (disposed || request != fontRequest) { face.Dispose(); return; }
         GraphRenderer next;
         try { next = new GraphRenderer(face); } catch { face.Dispose(); throw; }
-        renderer.Dispose(); customTypeface?.Dispose(); customTypeface = face; renderer = next; Invalidate();
+        renderer.Dispose(); customTypeface?.Dispose(); customTypeface = face; renderer = next; boundsSnapshot = null;
+        Session.LabelSizeProvider = label => renderer.MeasureLabel(label); Invalidate();
     }
 }

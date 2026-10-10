@@ -40,7 +40,8 @@ public sealed partial class GraphControl : ContentControl, IDisposable
         set
         {
             ArgumentNullException.ThrowIfNull(value); if (ReferenceEquals(document, value)) return;
-            Session.Dispose(); document = value; Session = new(value); Attach(); Invalidate();
+            var previous = document; clicks.Reset(); Session.Dispose(); document = value; Session = new(value); Attach();
+            DocumentChanged?.Invoke(this, new(previous, value)); Invalidate();
         }
     }
     public GraphControl()
@@ -57,13 +58,14 @@ public sealed partial class GraphControl : ContentControl, IDisposable
     }
     private void Attach()
     {
+        Session.LabelSizeProvider = label => renderer.MeasureLabel(label);
         Session.Invalidated += (_, _) => Invalidate(); Session.SelectionChanged += (_, _) => SelectionChanged?.Invoke(this, EventArgs.Empty); Session.StatusChanged += (_, text) => StatusChanged?.Invoke(this, text);
     }
     public void Invalidate() { if (!disposed) surface.Invalidate(); }
     private void Run(Action action) { try { action(); } catch (Exception ex) { Error?.Invoke(this, ex.Message); } }
     public void Fit()
     {
-        var index = Document.Snapshot.Index(); var bounds = RectD.Enclose(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => n.Bounds)); Session.Viewport.Fit(bounds, ActualWidth, ActualHeight); Invalidate();
+        Session.Viewport.Fit(ContentBounds, ActualWidth, ActualHeight); Invalidate();
     }
     public void Zoom(double factor) { Session.Viewport.ZoomAt(new(ActualWidth / 2, ActualHeight / 2), factor); Invalidate(); }
     public void SetMode(EditorMode mode) { clicks.Reset(); Session.CancelGesture(); Session.Mode = mode; Focus(FocusState.Programmatic); Invalidate(); }

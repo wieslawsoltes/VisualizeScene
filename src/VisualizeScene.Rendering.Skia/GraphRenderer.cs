@@ -54,7 +54,7 @@ public sealed partial class GraphRenderer : IDisposable
         foreach (var edge in edges.Values) edge.Path.Dispose(); edges.Clear();
         foreach (var edge in snapshot.Edges)
         {
-            if (index.VisibleRepresentative(edge.SourceId) == index.VisibleRepresentative(edge.TargetId) && edge.SourceId != edge.TargetId) continue;
+            if (!GraphScene.IsEdgeVisible(index, edge)) continue;
             var points = index.EdgePath(edge); var path = new SKPath(); path.MoveTo(Point(points[0]));
             foreach (var point in points.Skip(1)) path.LineTo(Point(point)); edges[edge.Id] = new(edge, points, path);
         }
@@ -90,7 +90,7 @@ public sealed partial class GraphRenderer : IDisposable
     public byte[] ExportPng(GraphSnapshot snapshot, double scale = 1)
     {
         if (!double.IsFinite(scale) || scale < .05 || scale > 8) throw new ArgumentOutOfRangeException(nameof(scale), "Export scale must be between 0.05 and 8.");
-        var bounds = snapshot.Bounds.Inflate(40); var pixelWidth = Math.Ceiling(bounds.Width * scale); var pixelHeight = Math.Ceiling(bounds.Height * scale);
+        var bounds = GraphScene.Bounds(snapshot, MeasureLabel).Inflate(40); var pixelWidth = Math.Ceiling(bounds.Width * scale); var pixelHeight = Math.Ceiling(bounds.Height * scale);
         if (!double.IsFinite(pixelWidth) || !double.IsFinite(pixelHeight) || pixelWidth < 1 || pixelHeight < 1 || pixelWidth > 16384 || pixelHeight > 16384 || pixelWidth * pixelHeight > 64000000)
             throw new InvalidOperationException("Raster export is limited to 64 million pixels and 16384 pixels per side. Use SVG for larger diagrams.");
         var width = (int)pixelWidth; var height = (int)pixelHeight;

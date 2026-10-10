@@ -29,6 +29,7 @@ public sealed partial class WorkbenchPage
         file.Items.Add(new MenuFlyoutSeparator()); Item(file, "Save JSON…", () => _ = Save("json"), "SaveJson"); Item(file, "Save GraphML…", () => _ = Save("graphml"), "SaveGraphML"); Item(file, "Export SVG…", () => _ = Save("svg"), "ExportSvg"); Item(file, "Export PNG…", () => _ = Save("png"), "ExportPng"); Item(file, "View document source…", () => _ = TextExchange(false), "ViewSource");
         var edit = Menu("Edit"); Item(edit, "Undo  Ctrl+Z", document.Undo); Item(edit, "Redo  Ctrl+Y", document.Redo); edit.Items.Add(new MenuFlyoutSeparator());
         Item(edit, "Copy  Ctrl+C", () => graph.Session.Copy()); Item(edit, "Paste  Ctrl+V", () => graph.Session.Paste()); Item(edit, "Duplicate  Ctrl+D", graph.Session.Duplicate); Item(edit, "Delete  Del", graph.Session.DeleteSelection); Item(edit, "Select all  Ctrl+A", graph.Session.SelectAll); Item(edit, "Edit label  F2", () => _ = graph.EditLabelAsync());
+        Item(edit, "Add independent label", graph.AddLabelToSelection, "AddLabel");
         Item(edit, "Add port to selected node", () =>
         {
             var index = document.Snapshot.Index(); var id = graph.Session.Selection.FirstOrDefault(index.Nodes.ContainsKey);

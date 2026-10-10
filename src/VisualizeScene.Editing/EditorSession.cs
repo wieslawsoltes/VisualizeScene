@@ -6,7 +6,7 @@ namespace VisualizeScene.Editing;
 public enum EditorMode { Select, CreateNode, CreateEdge, Pan }
 public enum Alignment { Left, HorizontalCenter, Right, Top, VerticalCenter, Bottom, DistributeHorizontal, DistributeVertical }
 [Flags] public enum InputModifiers { None = 0, Shift = 1, Control = 2, Alt = 4 }
-public enum HitKind { None, Node, Edge, Port, ResizeHandle, Bend, SourceHandle, TargetHandle }
+public enum HitKind { None, Node, Edge, Port, ResizeHandle, Bend, SourceHandle, TargetHandle, Label }
 public sealed record HitResult(HitKind Kind, string? Id = null, int Part = -1);
 
 /// <summary>Input/command state shared by desktop, browser and headless tests. A gesture commits one history entry.</summary>
@@ -56,7 +56,7 @@ public sealed partial class EditorSession : IDisposable
     private void DocumentChanged(object? sender, GraphChangedEventArgs args)
     {
         CancelGesture(false); Reindex();
-        var changed = selection.RemoveWhere(id => !index.Nodes.ContainsKey(id) && !index.Edges.ContainsKey(id) && !index.Ports.ContainsKey(id)) > 0;
+        var changed = selection.RemoveWhere(id => !index.Nodes.ContainsKey(id) && !index.Edges.ContainsKey(id) && !index.Ports.ContainsKey(id) && !index.Labels.ContainsKey(id)) > 0;
         if (changed) SelectionChanged?.Invoke(this, EventArgs.Empty);
         StatusChanged?.Invoke(this, args.Operation); Invalidate();
     }
@@ -64,17 +64,18 @@ public sealed partial class EditorSession : IDisposable
     {
         index = Document.Snapshot.Index();
         nodeIndex = new(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => (n.Bounds, n.Id)));
-        paths = Document.Snapshot.Edges.Where(e => index.VisibleRepresentative(e.SourceId) != index.VisibleRepresentative(e.TargetId) || e.SourceId == e.TargetId).ToDictionary(e => e.Id, index.EdgePath);
+        paths = Document.Snapshot.Edges.Where(e => GraphScene.IsEdgeVisible(index, e)).ToDictionary(e => e.Id, index.EdgePath);
         edgeIndex = new(paths.Select(p => (RectD.Enclose(p.Value.Select(v => new RectD(v.X, v.Y, 0, 0))).Inflate(1), p.Key)));
+        ReindexLabels();
     }
     public void Invalidate() => Invalidated?.Invoke(this, EventArgs.Empty);
     public void Select(IEnumerable<string> ids, bool additive = false)
     {
         if (!additive) selection.Clear();
-        foreach (var id in ids) if (index.Nodes.ContainsKey(id) || index.Edges.ContainsKey(id) || index.Ports.ContainsKey(id)) selection.Add(id);
+        foreach (var id in ids) if (index.Nodes.ContainsKey(id) || index.Edges.ContainsKey(id) || index.Ports.ContainsKey(id) || index.Labels.ContainsKey(id)) selection.Add(id);
         SelectionChanged?.Invoke(this, EventArgs.Empty); Invalidate();
     }
-    public void SelectAll() => Select(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => n.Id).Concat(paths.Keys));
+    public void SelectAll() => Select(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => n.Id).Concat(paths.Keys).Concat(Document.Snapshot.Labels.Where(l => GraphScene.IsOwnerVisible(index, l.OwnerId)).Select(l => l.Id)));
     public PointD Snap(PointD point)
     {
         if (!SnapToGrid) return point;
@@ -103,6 +104,12 @@ public sealed partial class EditorSession : IDisposable
             }
         }
         foreach (var p in Document.Snapshot.Ports) if (index.IsVisible(p.NodeId) && PointD.Distance(world, index.PortLocation(p.Id)) < tolerance) return new(HitKind.Port, p.Id);
+        if (Viewport.Zoom >= .25)
+        {
+            var labels = labelIndex.Query(new RectD(world.X, world.Y, 0, 0)).ToHashSet();
+            var label = Document.Snapshot.Labels.LastOrDefault(l => labels.Contains(l.Id));
+            if (label is not null) return new(HitKind.Label, label.Id);
+        }
         var candidates = nodeIndex.Query(new(world.X, world.Y, 0, 0)).ToHashSet();
         var hitNodes = Document.Snapshot.Nodes.Where(n => candidates.Contains(n.Id) && Geometry.HitNode(n, world)).Reverse().ToArray();
         var normal = hitNodes.FirstOrDefault(n => !n.IsGroup || n.Collapsed);
@@ -130,7 +137,7 @@ public sealed partial class EditorSession : IDisposable
         var world = Viewport.ToWorld(screen); var hit = Hit(world);
         if (Mode == EditorMode.CreateNode) { AddNode(world); return; }
         if (Mode == EditorMode.CreateEdge) { CreateEdgeContact(world); return; }
-        if (hit.Kind is HitKind.Node or HitKind.Edge or HitKind.Port)
+        if (hit.Kind is HitKind.Node or HitKind.Edge or HitKind.Port or HitKind.Label)
         {
             if (keys.HasFlag(InputModifiers.Control) || keys.HasFlag(InputModifiers.Shift))
             {
@@ -164,14 +171,23 @@ public sealed partial class EditorSession : IDisposable
         if (drag.Kind == HitKind.Port)
         {
             var port = index.Ports[drag.Id!]; if (!CanMovePort(port)) return;
-            edit.Update(port with { RelativeLocation = RelativePortLocation(index.Nodes[port.NodeId], Snap(world)) });
+            var center = index.PortLocation(port.Id);
+            MoveSelection(edit, Snap(center + (screen - start) * (1 / Viewport.Zoom)) - center);
+        }
+        else if (drag.Kind == HitKind.Label)
+        {
+            var label = index.Labels[drag.Id!]; if (!CanMoveOwner(label.OwnerId)) return;
+            var center = GraphScene.LabelAnchor(index, label.OwnerId) + label.Offset;
+            var delta = (screen - start) * (1 / Viewport.Zoom);
+            if (SnapToGrid) delta = Snap(center + delta) - center;
+            MoveSelection(edit, delta);
         }
         else if (drag.Kind == HitKind.Node)
         {
             var original = index.Nodes[drag.Id!]; if (original.Locked) return;
             var delta = (screen - start) * (1 / Viewport.Zoom);
             if (SnapToGrid) delta = Snap(new PointD(original.Bounds.X, original.Bounds.Y) + delta) - new PointD(original.Bounds.X, original.Bounds.Y);
-            edit.Move(selection, delta);
+            MoveSelection(edit, delta);
         }
         else if (drag.Kind == HitKind.ResizeHandle)
         {
@@ -197,7 +213,7 @@ public sealed partial class EditorSession : IDisposable
         var next = preview;
         var operation = drag.Kind switch
         {
-            HitKind.ResizeHandle => "Resize node", HitKind.Bend => "Move bend", HitKind.Port => "Move port",
+            HitKind.ResizeHandle => "Resize node", HitKind.Bend => "Move bend", HitKind.Port => "Move port", HitKind.Label => "Move labels",
             HitKind.SourceHandle => "Reconnect source", HitKind.TargetHandle => "Reconnect target", _ => "Move nodes"
         };
         var rectangle = Marquee; var additive = modifiers.HasFlag(InputModifiers.Control) || modifiers.HasFlag(InputModifiers.Shift);
@@ -218,15 +234,21 @@ public sealed partial class EditorSession : IDisposable
     }
     public GraphSnapshot Copy()
     {
-        clipboard = GraphClipboard.Copy(Document.Snapshot, selection); return clipboard;
+        CopyLabelsOnly(); clipboard = GraphClipboard.Copy(Document.Snapshot, selection); return clipboard;
     }
     public void Paste(GraphSnapshot? data = null)
     {
+        if (data is null && !labelClipboard.IsDefaultOrEmpty) { PasteLabels(labelClipboard); return; }
         data ??= clipboard; if (data is null) return;
         IReadOnlyList<string> added = [];
         Document.Edit("Paste", edit => added = GraphClipboard.Paste(edit, data, new(30, 30))); Select(added);
     }
-    public void Duplicate() => Paste(GraphClipboard.Copy(Document.Snapshot, selection));
+    public void Duplicate()
+    {
+        if (selection.Count > 0 && selection.All(index.Labels.ContainsKey))
+            PasteLabels(selection.Select(id => index.Labels[id]).ToArray(), keepOwners: true);
+        else Paste(GraphClipboard.Copy(Document.Snapshot, selection));
+    }
     public void Group()
     {
         string id = ""; Document.Edit("Group nodes", edit => id = edit.Group(selection)); Select([id]);
@@ -244,9 +266,9 @@ public sealed partial class EditorSession : IDisposable
     }
     public void Rename(string id, string text)
     {
-        Document.Edit("Edit label", edit => { if (index.Nodes.TryGetValue(id, out var n)) edit.Update(n with { Text = text }); else if (index.Edges.TryGetValue(id, out var e)) edit.Update(e with { Text = text }); });
+        Document.Edit("Edit label", edit => { if (index.Nodes.TryGetValue(id, out var n)) edit.Update(n with { Text = text }); else if (index.Edges.TryGetValue(id, out var e)) edit.Update(e with { Text = text }); else if (index.Labels.TryGetValue(id, out var label)) edit.Update(label with { Text = text }); });
     }
-    public void Nudge(PointD delta) => Document.Edit("Move selection", edit => edit.Move(selection, delta));
+    public void Nudge(PointD delta) => Document.Edit("Move selection", edit => MoveSelection(edit, delta));
     public void AddBend(string edgeId, PointD world)
     {
         var edge = index.Edges[edgeId]; var path = paths[edgeId]; var nearest = Enumerable.Range(1, path.Count - 1).MinBy(i => Geometry.DistanceToSegment(world, path[i - 1], path[i]));

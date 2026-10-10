@@ -24,12 +24,7 @@ public sealed partial class GraphRenderer
             case NodeShape.RoundedRectangle: path.AddRoundRect(Rect(b), 6, 6); break;
             case NodeShape.Ellipse: path.AddOval(Rect(b)); break;
             default:
-                PointD[] points = node.Shape switch
-                {
-                    NodeShape.Diamond => [new(b.Center.X, b.Y), new(b.Right, b.Center.Y), new(b.Center.X, b.Bottom), new(b.X, b.Center.Y)],
-                    NodeShape.Hexagon => [new(b.X + b.Width / 4, b.Y), new(b.Right - b.Width / 4, b.Y), new(b.Right, b.Center.Y), new(b.Right - b.Width / 4, b.Bottom), new(b.X + b.Width / 4, b.Bottom), new(b.X, b.Center.Y)],
-                    _ => [new(b.X + b.Width / 5, b.Y), new(b.Right, b.Y), new(b.Right - b.Width / 5, b.Bottom), new(b.X, b.Bottom)]
-                };
+                var points = Geometry.Polygon(node);
                 path.MoveTo(Point(points[0])); foreach (var point in points.Skip(1)) path.LineTo(Point(point)); path.Close(); break;
         }
         return path;
@@ -74,19 +69,17 @@ public sealed partial class GraphRenderer
         }
         if (!options.Overview && zoom >= .35 && edge.Edge.Text.Length > 0)
         {
-            var points = edge.Points; var position = PointD.Lerp(points[(points.Count - 1) / 2], points[points.Count / 2], .5); DrawText(canvas, edge.Edge.Text, position + new PointD(0, -9), 11, 220, 50, true);
+            var position = Geometry.PointAtFraction(edge.Points, .5); DrawText(canvas, edge.Edge.Text, position + new PointD(0, -9), 11, 220, 50, true);
         }
     }
     private void DrawLabels(SKCanvas canvas, GraphSnapshot snapshot, RectD view)
     {
         foreach (var label in snapshot.Labels)
         {
-            PointD center;
-            if (index!.Nodes.TryGetValue(label.OwnerId, out var node)) { if (!index.IsVisible(node.Id)) continue; center = node.Bounds.Center; }
-            else if (index.Ports.TryGetValue(label.OwnerId, out var port)) { if (!index.IsVisible(port.NodeId)) continue; center = index.PortLocation(port.Id); }
-            else if (edges.TryGetValue(label.OwnerId, out var edge)) center = PointD.Lerp(edge.Points[0], edge.Points[^1], .5);
-            else continue;
-            center += label.Offset; if (view.Inflate(200).Contains(center)) DrawText(canvas, label.Text, center, label.FontSize, background: true);
+            if (!GraphScene.IsOwnerVisible(index!, label.OwnerId)) continue;
+            var center = GraphScene.LabelAnchor(index!, label.OwnerId) + label.Offset;
+            var bounds = GraphScene.LabelBounds(index!, label, MeasureLabel(label));
+            if (view.Intersects(bounds)) DrawText(canvas, label.Text, center, label.FontSize, background: true);
         }
     }
     private void DrawSelection(SKCanvas canvas, double zoom, RenderOptions options)
@@ -101,6 +94,11 @@ public sealed partial class GraphRenderer
             if (index!.Nodes.TryGetValue(id, out var node) && index.IsVisible(id))
             {
                 var b = node.Bounds; Use(accent, SKPaintStyle.Stroke, (float)(1.6 / zoom)); canvas.DrawRect(Rect(b.Inflate(2 / zoom)), paint); if (!node.Locked) { Handle(new(b.X, b.Y)); Handle(new(b.Right, b.Y)); Handle(new(b.Right, b.Bottom)); Handle(new(b.X, b.Bottom)); }
+            }
+            else if (index!.Labels.TryGetValue(id, out var label) && zoom >= .25 && GraphScene.IsOwnerVisible(index, label.OwnerId))
+            {
+                var bounds = GraphScene.LabelBounds(index, label, MeasureLabel(label));
+                Use(accent, SKPaintStyle.Stroke, (float)(1.3 / zoom)); canvas.DrawRect(Rect(bounds.Inflate(2 / zoom)), paint);
             }
             else if (index!.Ports.TryGetValue(id, out var port) && index.IsVisible(port.NodeId))
             {

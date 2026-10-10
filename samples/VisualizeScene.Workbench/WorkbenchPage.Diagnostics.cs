@@ -40,7 +40,12 @@ public sealed partial class WorkbenchPage
         var selected = string.Join(",", graph.Session.Selection.Select(String));
         var index = document.Snapshot.Index();
         var paths = string.Join(",", document.Snapshot.Edges.Select(e => String(e.Id) + ":[" + string.Join(",", index.EdgePath(e).Select(p => $"{{\"x\":{Number(p.X)},\"y\":{Number(p.Y)}}}")) + "]"));
-        var script = $"globalThis.visualizeSceneState={{ready:{(ready ? "true" : "false")},frames:{frameCount},revision:{document.Revision},mode:'{graph.Session.Mode}',zoom:{Number(graph.Session.Viewport.Zoom)},origin:{{x:{Number(graph.Session.Viewport.Origin.X)},y:{Number(graph.Session.Viewport.Origin.Y)}}},canvas:{Bounds(graph)},controls:{{{controls}}},selection:[{selected}],edgePaths:{{{paths}}},error:{String(lastError)},analysis:{String(analysisOutput.Text)},status:{String(status.Text)},model:{model}}};";
+        var labels = string.Join(",", document.Snapshot.Labels.Select(label =>
+        {
+            var b = graph.Session.GetLabelBounds(label);
+            return String(label.Id) + $":{{\"x\":{Number(b.X)},\"y\":{Number(b.Y)},\"width\":{Number(b.Width)},\"height\":{Number(b.Height)}}}";
+        }));
+        var script = $"globalThis.visualizeSceneState={{ready:{(ready ? "true" : "false")},frames:{frameCount},revision:{document.Revision},mode:'{graph.Session.Mode}',zoom:{Number(graph.Session.Viewport.Zoom)},origin:{{x:{Number(graph.Session.Viewport.Origin.X)},y:{Number(graph.Session.Viewport.Origin.Y)}}},canvas:{Bounds(graph)},controls:{{{controls}}},selection:[{selected}],edgePaths:{{{paths}}},labelBounds:{{{labels}}},error:{String(lastError)},analysis:{String(analysisOutput.Text)},status:{String(status.Text)},model:{model}}};";
         Uno.Foundation.WebAssemblyRuntime.InvokeJS(script);
 #endif
     }

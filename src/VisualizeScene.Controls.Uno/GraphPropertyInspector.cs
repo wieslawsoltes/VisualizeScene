@@ -15,7 +15,7 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     public GraphControl? Target
     {
         get => target;
-        set { if (target is not null) { target.SelectionChanged -= Update; target.Document.Changed -= Changed; } target = value; if (target is not null) { target.SelectionChanged += Update; target.Document.Changed += Changed; } Refresh(); }
+        set { if (target is not null) { target.SelectionChanged -= Update; target.DocumentChanged -= Rebind; target.Document.Changed -= Changed; } target = value; if (target is not null) { target.SelectionChanged += Update; target.DocumentChanged += Rebind; target.Document.Changed += Changed; } Refresh(); }
     }
     public GraphPropertyInspector()
     {
@@ -23,6 +23,10 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
         Content = new ScrollViewer { Content = panel, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     }
     private void Update(object? sender, EventArgs args) => Refresh();
+    private void Rebind(object? sender, GraphDocumentChangedEventArgs args)
+    {
+        args.Previous.Changed -= Changed; args.Current.Changed += Changed; Refresh();
+    }
     private void Changed(object? sender, GraphChangedEventArgs args) => Refresh();
     private TextBox Text(string label, string value)
     {
@@ -32,7 +36,7 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     public void Refresh()
     {
         fields.Children.Clear(); message.Text = "";
-        if (target is null || target.Session.Selection.Count == 0) { title.Text = "Nothing selected"; message.Text = "Select a node, edge or port to inspect its properties. Changes are undoable."; return; }
+        if (target is null || target.Session.Selection.Count == 0) { title.Text = "Nothing selected"; message.Text = "Select a node, edge, port or label to inspect its properties. Changes are undoable."; return; }
         var ids = target.Session.Selection.ToArray(); title.Text = ids.Length == 1 ? "Item properties" : $"{ids.Length} items selected";
         if (ids.Length > 1) { message.Text = "Use the alignment and grouping commands for multiple items."; return; }
         var index = target.Document.Snapshot.Index(); var id = ids[0];
@@ -58,6 +62,19 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
             var endpoint = new TextBlock { Text = edge.SourceId + " → " + edge.TargetId, TextWrapping = TextWrapping.Wrap, FontSize = 11 }; fields.Children.Add(endpoint);
             Apply(() => { var current = target.Document.Snapshot.Index().Edges[id]; target.Document.Edit("Edit edge properties", edit => edit.Update(current with { Text = label.Text, Weight = N(weight), Stroke = stroke.Text, Routing = (EdgeRouting)routing.SelectedItem, Directed = directed.IsChecked == true })); });
             var clear = new Button { Content = "Clear bends", HorizontalAlignment = HorizontalAlignment.Stretch }; clear.Click += (_, _) => target.Document.Edit("Clear edge bends", edit => edit.Update(edit.Edge(id) with { Bends = [] })); fields.Children.Add(clear);
+        }
+        else if (index.Labels.TryGetValue(id, out var independent))
+        {
+            fields.Children.Add(new TextBlock { Text = "Owner: " + independent.OwnerId, FontSize = 11 });
+            var text = Text("Text", independent.Text); text.AcceptsReturn = true;
+            var x = Text("Offset X", F(independent.Offset.X)); var y = Text("Offset Y", F(independent.Offset.Y));
+            var size = Text("Font size", F(independent.FontSize));
+            Apply(() =>
+            {
+                var current = target.Document.Snapshot.Index().Labels[id];
+                target.Document.Edit("Edit label properties", edit => edit.Update(current with { Text = text.Text, Offset = new(N(x), N(y)), FontSize = N(size) }));
+            });
+            message.Text = "This label follows its owner. Drag it to change its offset; F2 edits its text.";
         }
         else if (index.Ports.TryGetValue(id, out var port))
         {

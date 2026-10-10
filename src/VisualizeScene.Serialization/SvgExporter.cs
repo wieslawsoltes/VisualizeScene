@@ -7,11 +7,11 @@ namespace VisualizeScene.Serialization;
 public static class SvgExporter
 {
     private static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
-    public static string Export(GraphSnapshot graph)
+    public static string Export(GraphSnapshot graph, Func<GraphLabel, PointD>? measureLabel = null)
     {
         GraphValidation.Validate(graph); var index = graph.Index(); XNamespace ns = "http://www.w3.org/2000/svg";
         var visible = graph.Nodes.Where(n => index.IsVisible(n.Id)).ToArray();
-        var bounds = RectD.Enclose(visible.Select(n => n.Bounds).Concat(graph.Edges.SelectMany(e => index.EdgePath(e)).Select(p => new RectD(p.X, p.Y, 0, 0)))).Inflate(40);
+        var bounds = GraphScene.Bounds(graph, measureLabel).Inflate(40);
         var svg = new XElement(ns + "svg", new XAttribute("viewBox", $"{F(bounds.X)} {F(bounds.Y)} {F(bounds.Width)} {F(bounds.Height)}"), new XAttribute("width", F(bounds.Width)), new XAttribute("height", F(bounds.Height)), new XAttribute("role", "img"), new XElement(ns + "title", "VisualizeScene graph"));
         var marker = new XElement(ns + "marker", new XAttribute("id", "arrow"), new XAttribute("viewBox", "0 0 10 10"), new XAttribute("refX", "9"), new XAttribute("refY", "5"), new XAttribute("markerWidth", "7"), new XAttribute("markerHeight", "7"), new XAttribute("orient", "auto-start-reverse"), new XElement(ns + "path", new XAttribute("d", "M 0 0 L 10 5 L 0 10 z"), new XAttribute("fill", "context-stroke")));
         svg.Add(new XElement(ns + "defs", marker));
@@ -28,12 +28,7 @@ public static class SvgExporter
             if (node.Shape == NodeShape.Ellipse) element = new(ns + "ellipse", new XAttribute("cx", F(b.Center.X)), new XAttribute("cy", F(b.Center.Y)), new XAttribute("rx", F(b.Width / 2)), new XAttribute("ry", F(b.Height / 2)));
             else if (node.Shape is NodeShape.Diamond or NodeShape.Hexagon or NodeShape.Parallelogram)
             {
-                PointD[] points = node.Shape switch
-                {
-                    NodeShape.Diamond => [new(b.Center.X, b.Y), new(b.Right, b.Center.Y), new(b.Center.X, b.Bottom), new(b.X, b.Center.Y)],
-                    NodeShape.Hexagon => [new(b.X + b.Width / 4, b.Y), new(b.Right - b.Width / 4, b.Y), new(b.Right, b.Center.Y), new(b.Right - b.Width / 4, b.Bottom), new(b.X + b.Width / 4, b.Bottom), new(b.X, b.Center.Y)],
-                    _ => [new(b.X + b.Width / 5, b.Y), new(b.Right, b.Y), new(b.Right - b.Width / 5, b.Bottom), new(b.X, b.Bottom)]
-                };
+                var points = Geometry.Polygon(node);
                 element = new(ns + "polygon", new XAttribute("points", string.Join(" ", points.Select(p => $"{F(p.X)},{F(p.Y)}"))));
             }
             else element = new(ns + "rect", new XAttribute("x", F(b.X)), new XAttribute("y", F(b.Y)), new XAttribute("width", F(b.Width)), new XAttribute("height", F(b.Height)), new XAttribute("rx", node.Shape == NodeShape.RoundedRectangle ? "6" : "0"));
@@ -44,19 +39,22 @@ public static class SvgExporter
         foreach (var n in visible.Where(n => n.IsGroup && !n.Collapsed).OrderBy(Depth)) Node(n);
         foreach (var edge in graph.Edges)
         {
-            if (index.VisibleRepresentative(edge.SourceId) == index.VisibleRepresentative(edge.TargetId) && edge.SourceId != edge.TargetId) continue;
+            if (!GraphScene.IsEdgeVisible(index, edge)) continue;
             var path = index.EdgePath(edge); var e = new XElement(ns + "polyline", new XAttribute("points", string.Join(" ", path.Select(p => $"{F(p.X)},{F(p.Y)}"))), new XAttribute("fill", "none"), new XAttribute("stroke", edge.Stroke), new XAttribute("stroke-width", "1.5"), new XAttribute("stroke-linejoin", "round"));
             if (edge.Directed) e.Add(new XAttribute("marker-end", "url(#arrow)")); svg.Add(e);
-            if (edge.Text.Length > 0) Text(edge.Text, PointD.Lerp(path[(path.Count - 1) / 2], path[path.Count / 2], .5) + new PointD(0, -9));
+            if (edge.Text.Length > 0) Text(edge.Text, Geometry.PointAtFraction(path, .5) + new PointD(0, -9));
         }
         foreach (var n in visible.Where(n => !n.IsGroup || n.Collapsed)) Node(n);
         foreach (var label in graph.Labels)
         {
-            PointD position;
-            if (index.Nodes.TryGetValue(label.OwnerId, out var node)) { if (!index.IsVisible(node.Id)) continue; position = node.Bounds.Center; }
-            else if (index.Edges.TryGetValue(label.OwnerId, out var edge)) { var points = index.EdgePath(edge); position = PointD.Lerp(points[0], points[^1], .5); }
-            else { if (!index.IsVisible(index.Ports[label.OwnerId].NodeId)) continue; position = index.PortLocation(label.OwnerId); }
-            Text(label.Text, position + label.Offset, label.FontSize);
+            if (!GraphScene.IsOwnerVisible(index, label.OwnerId)) continue;
+            Text(label.Text, GraphScene.LabelAnchor(index, label.OwnerId) + label.Offset, label.FontSize);
+        }
+        foreach (var port in graph.Ports.Where(p => index.IsVisible(p.NodeId)))
+        {
+            var point = index.PortLocation(port.Id);
+            svg.Add(new XElement(ns + "circle", new XAttribute("cx", F(point.X)), new XAttribute("cy", F(point.Y)),
+                new XAttribute("r", "3.5"), new XAttribute("fill", "white"), new XAttribute("stroke", "#386797")));
         }
         return new XDocument(svg).ToString();
     }

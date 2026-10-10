@@ -30,6 +30,8 @@ with sync_playwright() as p:
         return state()
 
     def click(name):
+        key = json.dumps(name)
+        wait(f"v.controls[{key}] && v.controls[{key}].width > 0 && v.controls[{key}].height > 0")
         b = state()["controls"][name]
         assert b and b["width"] > 0 and b["height"] > 0, name
         page.mouse.click(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
@@ -202,6 +204,58 @@ with sync_playwright() as p:
             assert state()["revision"] == revision
             assert node(ids[0])["Text"] == "Double-click editor"
         record("Canceling the label dialog preserves the document", cancel_label)
+        def independent_label():
+            click("MenuEdit")
+            click("AddLabel")
+            wait("v.model.Graph.Labels.length === 1")
+            assert state()["model"]["Graph"]["Labels"][0]["OwnerId"] == ids[0]
+        record("Add an independent label to the selected node", independent_label)
+        label_id = state()["model"]["Graph"]["Labels"][0]["Id"]
+
+        def move_label():
+            s = state()
+            b = s["labelBounds"][label_id]
+            before = s["model"]["Graph"]["Labels"][0]["Offset"].copy()
+            center = (b["x"]+b["width"]/2, b["y"]+b["height"]/2)
+            drag(screen(*center), screen(center[0]+40, center[1]+30))
+            wait(f"v.revision === {s['revision']+1}")
+            after = state()["model"]["Graph"]["Labels"][0]["Offset"]
+            assert after != before and len(state()["model"]["Graph"]["Nodes"]) == 3
+            click("Undo")
+            wait("v.model.Graph.Labels[0].Offset.X === " + str(before["X"]))
+        record("Drag an independent label using measured bounds and undo", move_label)
+
+        def rename_label():
+            # Undo toolbar has keyboard focus; click the restored label before F2.
+            b = state()["labelBounds"][label_id]
+            page.mouse.click(*screen(b["x"]+b["width"]/2, b["y"]+b["height"]/2))
+            page.keyboard.press("F2")
+            page.wait_for_timeout(300)
+            page.keyboard.press("Control+a")
+            page.keyboard.type("Independent annotation")
+            page.keyboard.press("Tab")
+            page.keyboard.press("Enter")
+            wait("v.model.Graph.Labels[0].Text === 'Independent annotation'")
+        record("Edit independent label text with F2", rename_label)
+
+        def duplicate_label():
+            page.keyboard.press("Control+d")
+            wait("v.model.Graph.Labels.length === 2")
+            assert len(state()["model"]["Graph"]["Nodes"]) == 3
+            assert state()["model"]["Graph"]["Labels"][1]["OwnerId"] == ids[0]
+        record("Duplicate only a label without duplicating its node", duplicate_label)
+
+        def retarget_label():
+            page.keyboard.press("Control+c")
+            page.mouse.click(*node_point(ids[2]))
+            page.keyboard.press("Control+v")
+            wait("v.model.Graph.Labels.length === 3")
+            assert state()["model"]["Graph"]["Labels"][-1]["OwnerId"] == ids[2]
+            page.keyboard.press("Delete")
+            wait("v.model.Graph.Labels.length === 2")
+            page.keyboard.press("Control+z")
+            wait("v.model.Graph.Labels.length === 3")
+        record("Paste a label onto another owner, delete and restore it", retarget_label)
         page.screenshot(path=str(output/"editing.png"), full_page=True)
         assert not errors, errors
     except Exception as error:

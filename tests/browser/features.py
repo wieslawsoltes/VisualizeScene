@@ -17,6 +17,10 @@ results, errors, console = [], [], []
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, args=["--enable-unsafe-swiftshader", "--use-angle=swiftshader", "--disable-dev-shm-usage"])
     page = browser.new_page(viewport={"width": 1440, "height": 1050}, device_scale_factor=1, accept_downloads=True)
+    # Exercise Uno's upload fallback (as in browsers without File System Access).
+    # Playwright cannot intercept Chromium's native showOpenFilePicker dialog.
+    # Only capability detection is varied; file contents still enter via a real input.
+    page.add_init_script("Object.defineProperty(window, 'showOpenFilePicker', {value: undefined, configurable: true});")
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.on("console", lambda message: console.append({"type": message.type, "text": message.text}))
     page.set_default_timeout(30000)
@@ -173,7 +177,7 @@ with sync_playwright() as p:
             chooser.value.set_files(str(output / "export.json"))
             wait("v.status === 'Graph imported.'")
             assert state()["model"] == json.loads((output / "export.json").read_text(encoding="utf-8"))
-        record("Open downloaded JSON through the browser file chooser", open_roundtrip)
+        record("Open downloaded JSON through the browser upload-picker fallback", open_roundtrip)
 
         # Opening a file marks the document saved; each sample replacement also starts clean.
         for i, expected in enumerate([10, 17, 40, 14, 5, 1000]):
@@ -199,7 +203,7 @@ with sync_playwright() as p:
             (output / "state.json").write_text(json.dumps(state(), indent=2), encoding="utf-8")
         except Exception:
             pass
-        (output / "report.json").write_text(json.dumps({"url": url, "results": results, "errors": errors, "note": "Actual Uno WebAssembly input tests on Chromium/SwiftShader; not hardware GPU benchmarking."}, indent=2), encoding="utf-8")
+        (output / "report.json").write_text(json.dumps({"url": url, "results": results, "errors": errors, "note": "Actual Uno WebAssembly input tests on Chromium/SwiftShader; upload-picker fallback (native OS picker not automated); not hardware GPU benchmarking."}, indent=2), encoding="utf-8")
         (output / "console.json").write_text(json.dumps(console, indent=2), encoding="utf-8")
         browser.close()
 

@@ -60,7 +60,7 @@ public sealed partial class GraphControl
         if (hit.Kind == HitKind.None) Run(() => Session.AddNode(world));
         else if (hit.Kind == HitKind.Node && Document.Snapshot.Index().Nodes[hit.Id!].IsGroup) Run(() => Session.ToggleGroup(hit.Id!));
         else if (hit.Kind == HitKind.Edge && Modifiers().HasFlag(InputModifiers.Control)) Run(() => Session.AddBend(hit.Id!, world));
-        else if (hit.Kind is HitKind.Node or HitKind.Edge) await EditLabelAsync(hit.Id!);
+        else if (hit.Kind is HitKind.Node or HitKind.Edge or HitKind.Label) await EditLabelAsync(hit.Id!);
     }
     public async Task EditLabelAsync(string? id = null)
     {
@@ -68,8 +68,8 @@ public sealed partial class GraphControl
         id ??= Session.Selection.FirstOrDefault(); if (id is null) return;
         var document = Document; var session = Session; var revision = document.Revision;
         var index = document.Snapshot.Index();
-        if (!index.Nodes.ContainsKey(id) && !index.Edges.ContainsKey(id)) return;
-        var value = index.Nodes.TryGetValue(id, out var n) ? n.Text : index.Edges[id].Text;
+        if (!index.Nodes.ContainsKey(id) && !index.Edges.ContainsKey(id) && !index.Labels.ContainsKey(id)) return;
+        var value = index.Nodes.TryGetValue(id, out var n) ? n.Text : index.Edges.TryGetValue(id, out var e) ? e.Text : index.Labels[id].Text;
         var input = new TextBox { Text = value, AcceptsReturn = true, MinWidth = 320, MinHeight = 80 }; AutomationProperties.SetAutomationId(input, "LabelText");
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Edit label", Content = input, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary };
         dialog.Opened += (_, _) => { input.Focus(FocusState.Programmatic); input.SelectAll(); };
@@ -82,7 +82,8 @@ public sealed partial class GraphControl
                 document.Edit("Edit label", edit =>
                 {
                     if (index.Nodes.TryGetValue(id, out var node)) edit.Update(node with { Text = input.Text });
-                    else edit.Update(index.Edges[id] with { Text = input.Text });
+                    else if (index.Edges.TryGetValue(id, out var edge)) edit.Update(edge with { Text = input.Text });
+                    else edit.Update(index.Labels[id] with { Text = input.Text });
                 }, revision);
             }
         }
@@ -127,6 +128,7 @@ public sealed partial class GraphControl
         var menu = new MenuFlyout();
         void Item(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => Run(action); menu.Items.Add(item); }
         Item("Edit label  F2", () => _ = EditLabelAsync());
+        Item("Add independent label", AddLabelToSelection);
         Item("Add port", () =>
         {
             var index = Document.Snapshot.Index(); var id = Session.Selection.FirstOrDefault(index.Nodes.ContainsKey);

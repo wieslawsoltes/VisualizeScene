@@ -28,6 +28,7 @@ public sealed class GraphIndex
     public IReadOnlyDictionary<string, GraphNode> Nodes { get; }
     public IReadOnlyDictionary<string, GraphEdge> Edges { get; }
     public IReadOnlyDictionary<string, GraphPort> Ports { get; }
+    public IReadOnlyDictionary<string, GraphLabel> Labels { get; }
     private readonly Dictionary<string, List<GraphEdge>> outgoing = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<GraphEdge>> incoming = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<GraphNode>> children = new(StringComparer.Ordinal);
@@ -37,6 +38,7 @@ public sealed class GraphIndex
         Nodes = graph.Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
         Edges = graph.Edges.ToDictionary(e => e.Id, StringComparer.Ordinal);
         Ports = graph.Ports.ToDictionary(p => p.Id, StringComparer.Ordinal);
+        Labels = graph.Labels.ToDictionary(l => l.Id, StringComparer.Ordinal);
         foreach (var n in graph.Nodes) { outgoing[n.Id] = []; incoming[n.Id] = []; children[n.Id] = []; }
         foreach (var e in graph.Edges) { outgoing[e.SourceId].Add(e); incoming[e.TargetId].Add(e); }
         foreach (var n in graph.Nodes) if (n.ParentId is not null) children[n.ParentId].Add(n);
@@ -66,26 +68,30 @@ public sealed class GraphIndex
     {
         var source = VisibleRepresentative(edge.SourceId); var target = VisibleRepresentative(edge.TargetId);
         var a = Nodes[source]; var b = Nodes[target];
-        if (source == target)
-        {
-            var r = a.Bounds;
-            return [new(r.Right, r.Center.Y), new(r.Right + 35, r.Center.Y), new(r.Right + 35, r.Y - 25), new(r.Center.X, r.Y - 25), new(r.Center.X, r.Y)];
-        }
         var bends = edge.Bends.IsDefault ? ImmutableArray<PointD>.Empty : edge.Bends;
         if (source != edge.SourceId || target != edge.TargetId) bends = [];
-        var start = edge.SourcePortId is not null && source == edge.SourceId ? PortLocation(edge.SourcePortId) : Geometry.ClipToNode(a, bends.Length > 0 ? bends[0] : b.Bounds.Center);
-        var end = edge.TargetPortId is not null && target == edge.TargetId ? PortLocation(edge.TargetPortId) : Geometry.ClipToNode(b, bends.Length > 0 ? bends[^1] : a.Bounds.Center);
+        var sourcePort = edge.SourcePortId is not null && source == edge.SourceId ? edge.SourcePortId : null;
+        var targetPort = edge.TargetPortId is not null && target == edge.TargetId ? edge.TargetPortId : null;
+        if (source == target && bends.Length == 0)
+        {
+            var r = a.Bounds;
+            var loopStart = sourcePort is not null ? PortLocation(sourcePort) : Geometry.ClipToNode(a, new(r.Right + 35, r.Center.Y));
+            var loopEnd = targetPort is not null ? PortLocation(targetPort) : Geometry.ClipToNode(a, new(r.Center.X, r.Y - 35));
+            return Geometry.SelfLoop(r, loopStart, loopEnd);
+        }
+        var start = sourcePort is not null ? PortLocation(sourcePort) : Geometry.ClipToNode(a, bends.Length > 0 ? bends[0] : b.Bounds.Center);
+        var end = targetPort is not null ? PortLocation(targetPort) : Geometry.ClipToNode(b, bends.Length > 0 ? bends[^1] : a.Bounds.Center);
         if (bends.Length > 0) return new[] { start }.Concat(bends).Append(end).ToArray();
         if (edge.Routing == EdgeRouting.Polyline) return [start, end];
         if (Math.Abs(b.Bounds.Center.Y - a.Bounds.Center.Y) >= Math.Abs(b.Bounds.Center.X - a.Bounds.Center.X))
         {
-            start = edge.SourcePortId is null ? Geometry.ClipToNode(a, new(a.Bounds.Center.X, b.Bounds.Center.Y)) : start;
-            end = edge.TargetPortId is null ? Geometry.ClipToNode(b, new(b.Bounds.Center.X, a.Bounds.Center.Y)) : end;
+            start = sourcePort is null ? Geometry.ClipToNode(a, new(a.Bounds.Center.X, b.Bounds.Center.Y)) : start;
+            end = targetPort is null ? Geometry.ClipToNode(b, new(b.Bounds.Center.X, a.Bounds.Center.Y)) : end;
             var y = (start.Y + end.Y) / 2;
             return [start, new(start.X, y), new(end.X, y), end];
         }
-        start = edge.SourcePortId is null ? Geometry.ClipToNode(a, new(b.Bounds.Center.X, a.Bounds.Center.Y)) : start;
-        end = edge.TargetPortId is null ? Geometry.ClipToNode(b, new(a.Bounds.Center.X, b.Bounds.Center.Y)) : end;
+        start = sourcePort is null ? Geometry.ClipToNode(a, new(b.Bounds.Center.X, a.Bounds.Center.Y)) : start;
+        end = targetPort is null ? Geometry.ClipToNode(b, new(a.Bounds.Center.X, b.Bounds.Center.Y)) : end;
         var x = (start.X + end.X) / 2;
         return [start, new(x, start.Y), new(x, end.Y), end];
     }

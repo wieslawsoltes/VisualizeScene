@@ -22,7 +22,7 @@ public sealed class DoubleClickRecognizer
     {
         if (IntervalMilliseconds < 1 || !double.IsFinite(Distance) || Distance < 0)
             throw new InvalidOperationException("Double-click interval and distance must be valid.");
-        if (mode != EditorMode.Select || hit.Kind is not (HitKind.None or HitKind.Node or HitKind.Edge))
+        if (mode != EditorMode.Select || hit.Kind is not (HitKind.None or HitKind.Node or HitKind.Edge or HitKind.Label))
         {
             Reset(); return;
         }

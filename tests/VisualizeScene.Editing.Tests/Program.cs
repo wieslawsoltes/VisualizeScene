@@ -67,6 +67,7 @@ Test("Stale drag is canceled without overwrite", () =>
 });
 
 ConnectionTests.Run(Test);
+LabelTests.Run(Test);
 
 Directory.CreateDirectory("artifacts/validation");
 var failures = results.Count(r => r.Error is not null);

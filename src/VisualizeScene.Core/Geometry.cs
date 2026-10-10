@@ -33,7 +33,7 @@ public readonly record struct RectD(double X, double Y, double Width, double Hei
     }
 }
 
-public static class Geometry
+public static partial class Geometry
 {
     public static double DistanceToSegment(PointD p, PointD a, PointD b)
     {
@@ -44,31 +44,7 @@ public static class Geometry
         return PointD.Distance(p, PointD.Lerp(a, b, t));
     }
 
-    public static PointD ClipToNode(GraphNode node, PointD toward)
-    {
-        var b = node.Bounds;
-        var c = b.Center;
-        var d = toward - c;
-        if (d.Length < 1e-9) return c;
-        var rx = Math.Max(b.Width / 2, .001);
-        var ry = Math.Max(b.Height / 2, .001);
-        var t = node.Shape switch
-        {
-            NodeShape.Ellipse => 1 / Math.Sqrt(d.X * d.X / (rx * rx) + d.Y * d.Y / (ry * ry)),
-            NodeShape.Diamond => 1 / (Math.Abs(d.X) / rx + Math.Abs(d.Y) / ry),
-            _ => 1 / Math.Max(Math.Abs(d.X) / rx, Math.Abs(d.Y) / ry)
-        };
-        return c + d * t;
-    }
 
-    public static bool HitNode(GraphNode node, PointD p)
-    {
-        if (!node.Bounds.Contains(p)) return false;
-        var b = node.Bounds;
-        var x = Math.Abs(p.X - b.Center.X) / Math.Max(.001, b.Width / 2);
-        var y = Math.Abs(p.Y - b.Center.Y) / Math.Max(.001, b.Height / 2);
-        return node.Shape switch { NodeShape.Ellipse => x * x + y * y <= 1, NodeShape.Diamond => x + y <= 1, _ => true };
-    }
 }
 
 public sealed class Viewport

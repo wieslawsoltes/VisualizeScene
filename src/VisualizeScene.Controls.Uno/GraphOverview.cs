@@ -17,7 +17,7 @@ public sealed class GraphOverview : ContentControl, IDisposable
         protected override void RenderOverride(SKCanvas canvas, Size area)
         {
             var target = owner.target; if (target is null) return;
-            owner.viewport.Fit(target.Document.Snapshot.Bounds, area.Width, area.Height, 10);
+            owner.viewport.Fit(target.ContentBounds, area.Width, area.Height, 10);
             owner.renderer.Render(canvas, target.Document.Snapshot, owner.viewport, area.Width, area.Height, new(ShowGrid: false, Overview: true));
             var origin = owner.viewport.ToScreen(target.Session.Viewport.Origin);
             var width = target.ActualWidth / target.Session.Viewport.Zoom * owner.viewport.Zoom; var height = target.ActualHeight / target.Session.Viewport.Zoom * owner.viewport.Zoom;
@@ -50,5 +50,5 @@ public sealed class GraphOverview : ContentControl, IDisposable
         if (target is null) return; var p = args.GetCurrentPoint(this).Position;
         target.Session.Viewport.Center(viewport.ToWorld(new(p.X, p.Y)), target.ActualWidth, target.ActualHeight); target.Invalidate(); args.Handled = true;
     }
-    public void Dispose() { Target = null; renderer.Dispose(); }
+    public new void Dispose() { Target = null; renderer.Dispose(); }
 }
