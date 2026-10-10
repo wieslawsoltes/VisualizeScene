@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -11,6 +12,10 @@ namespace VisualizeScene.Controls.Uno;
 
 public sealed partial class GraphControl
 {
+    private readonly DoubleClickRecognizer clicks = new();
+    private bool editingLabel;
+    private static long ClickTime => (long)(Stopwatch.GetTimestamp() * (1000d / Stopwatch.Frequency));
+
     private static InputModifiers Modifiers()
     {
         bool Down(VirtualKey key) => Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
@@ -19,25 +24,39 @@ public sealed partial class GraphControl
     private PointD Position(PointerRoutedEventArgs args) { var p = args.GetCurrentPoint(this).Position; return new(p.X, p.Y); }
     private void Pressed(object sender, PointerRoutedEventArgs args)
     {
-        var point = args.GetCurrentPoint(this); if (point.Properties.IsRightButtonPressed) return; Focus(FocusState.Pointer);
+        var point = args.GetCurrentPoint(this);
+        if (editingLabel || point.Properties.IsRightButtonPressed) { clicks.Reset(); return; }
+        Focus(FocusState.Pointer);
+        var screen = Position(args);
+        if (point.Properties.IsMiddleButtonPressed) clicks.Reset();
+        else clicks.Press(Session.Hit(Session.Viewport.ToWorld(screen)), Session.Mode, Modifiers(), screen, Document.Revision, ClickTime);
         // An edge command spans separate contacts; releasing the first must retain its source.
         if (Session.Mode != EditorMode.CreateEdge) CapturePointer(args.Pointer);
         Run(() => Session.PointerDown(Position(args), Modifiers(), point.Properties.IsMiddleButtonPressed)); args.Handled = true;
     }
-    private void Moved(object sender, PointerRoutedEventArgs args) => Run(() => Session.PointerMove(Position(args)));
-    private void Released(object sender, PointerRoutedEventArgs args)
+    private void Moved(object sender, PointerRoutedEventArgs args)
     {
-        Run(() => Session.PointerUp(Position(args))); releasingCapture = true;
-        try { ReleasePointerCapture(args.Pointer); } finally { releasingCapture = false; } args.Handled = true;
+        clicks.Move(Position(args));
+        if (!editingLabel) Run(() => Session.PointerMove(Position(args)));
+    }
+    private async void Released(object sender, PointerRoutedEventArgs args)
+    {
+        var screen = Position(args);
+        Run(() => Session.PointerUp(screen));
+        var doubleClick = clicks.Release(screen, Document.Revision, ClickTime);
+        releasingCapture = true;
+        try { ReleasePointerCapture(args.Pointer); } finally { releasingCapture = false; }
+        args.Handled = true;
+        if (doubleClick is not null && Session.Mode == EditorMode.Select && !editingLabel)
+            await ActivateDoubleClickAsync(doubleClick, Session.Viewport.ToWorld(screen));
     }
     private void Wheel(object sender, PointerRoutedEventArgs args)
     {
+        clicks.Reset();
         var delta = args.GetCurrentPoint(this).Properties.MouseWheelDelta; Session.Viewport.ZoomAt(Position(args), Math.Pow(1.15, delta / 120d)); Invalidate(); args.Handled = true;
     }
-    private async void DoubleTap(object sender, DoubleTappedRoutedEventArgs args)
+    private async Task ActivateDoubleClickAsync(HitResult hit, PointD world)
     {
-        var p = args.GetPosition(this); var world = Session.Viewport.ToWorld(new(p.X, p.Y)); var hit = Session.Hit(world, false); args.Handled = true;
-        if (Session.Mode != EditorMode.Select) return;
         if (hit.Kind == HitKind.None) Run(() => Session.AddNode(world));
         else if (hit.Kind == HitKind.Node && Document.Snapshot.Index().Nodes[hit.Id!].IsGroup) Run(() => Session.ToggleGroup(hit.Id!));
         else if (hit.Kind == HitKind.Edge && Modifiers().HasFlag(InputModifiers.Control)) Run(() => Session.AddBend(hit.Id!, world));
@@ -45,16 +64,35 @@ public sealed partial class GraphControl
     }
     public async Task EditLabelAsync(string? id = null)
     {
+        if (editingLabel) return;
         id ??= Session.Selection.FirstOrDefault(); if (id is null) return;
-        var index = Document.Snapshot.Index(); var value = index.Nodes.TryGetValue(id, out var n) ? n.Text : index.Edges.TryGetValue(id, out var e) ? e.Text : "";
+        var document = Document; var session = Session; var revision = document.Revision;
+        var index = document.Snapshot.Index();
+        if (!index.Nodes.ContainsKey(id) && !index.Edges.ContainsKey(id)) return;
+        var value = index.Nodes.TryGetValue(id, out var n) ? n.Text : index.Edges[id].Text;
         var input = new TextBox { Text = value, AcceptsReturn = true, MinWidth = 320, MinHeight = 80 }; AutomationProperties.SetAutomationId(input, "LabelText");
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Edit label", Content = input, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary };
         dialog.Opened += (_, _) => { input.Focus(FocusState.Programmatic); input.SelectAll(); };
-        try { if (await dialog.ShowAsync() == ContentDialogResult.Primary) Session.Rename(id, input.Text); } catch (Exception ex) { Error?.Invoke(this, ex.Message); }
-        Focus(FocusState.Programmatic);
+        clicks.Reset(); Session.CancelGesture(); editingLabel = true;
+        try
+        {
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                if (Document != document || Session != session) throw new InvalidOperationException("The edited document was replaced.");
+                document.Edit("Edit label", edit =>
+                {
+                    if (index.Nodes.TryGetValue(id, out var node)) edit.Update(node with { Text = input.Text });
+                    else edit.Update(index.Edges[id] with { Text = input.Text });
+                }, revision);
+            }
+        }
+        catch (Exception ex) { Error?.Invoke(this, ex.Message); }
+        finally { editingLabel = false; clicks.Reset(); if (!disposed) Focus(FocusState.Programmatic); }
     }
     private async void Key(object sender, KeyRoutedEventArgs args)
     {
+        clicks.Reset();
+        if (editingLabel) return;
         var modifiers = Modifiers(); var control = modifiers.HasFlag(InputModifiers.Control); var shift = modifiers.HasFlag(InputModifiers.Shift); var handled = true;
         try
         {

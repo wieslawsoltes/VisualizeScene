@@ -19,6 +19,8 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Run core conformance
         run: dotnet run --project tests/VisualizeScene.Tests -c Release
+      - name: Run editor interaction regressions
+        run: dotnet run --project tests/VisualizeScene.Editing.Tests -c Release
       - name: Run bounded text layout regressions
         run: dotnet run --project tests/VisualizeScene.Rendering.Tests -c Release
       - name: Build reusable packages
@@ -73,11 +75,14 @@ jobs:
           path: artifacts/site/VisualizeScene
           include-hidden-files: true
       - name: Package Uno controls
-        run: dotnet pack src/VisualizeScene.Controls.Uno -c Release -o artifacts/uno-packages
+        run: |
+          dotnet pack src/VisualizeScene.Controls.Uno -c Release -p:IsPackable=true -o artifacts/uno-packages
+          test "$(find artifacts/uno-packages -name '*.nupkg' | wc -l)" -gt 0
       - uses: actions/upload-artifact@v4
         with:
           name: uno-controls
           path: artifacts/uno-packages
+          if-no-files-found: error
       - name: Install browser test dependencies
         run: python -m pip install playwright && python -m playwright install --with-deps chromium
       - name: Browser interactions

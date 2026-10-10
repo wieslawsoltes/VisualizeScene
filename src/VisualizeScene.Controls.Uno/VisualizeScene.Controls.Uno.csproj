@@ -3,6 +3,7 @@
     <TargetFrameworks>net10.0-desktop;net10.0-browserwasm</TargetFrameworks>
     <TargetFrameworks Condition="'$(VisualizeSceneTargetFrameworks)' != ''">$(VisualizeSceneTargetFrameworks)</TargetFrameworks>
     <OutputType>Library</OutputType>
+    <IsPackable>true</IsPackable>
     <UnoSingleProject>true</UnoSingleProject>
     <UnoFeatures>SkiaRenderer</UnoFeatures>
     <Description>Reusable Uno Platform graph editor, overview, node palette and property inspector controls.</Description>
