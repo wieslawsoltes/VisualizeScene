@@ -17,8 +17,16 @@ python -m playwright install chromium
 python -m http.server 8080 --directory artifacts/site
 # In another terminal:
 python tests/browser/interaction.py 'http://127.0.0.1:8080/VisualizeScene/?test=1'
+python tests/browser/editing.py 'http://127.0.0.1:8080/VisualizeScene/?test=1'
+python tests/browser/features.py 'http://127.0.0.1:8080/VisualizeScene/?test=1'
 ```
 
 CI uses Chromium with the SwiftShader software graphics driver. It records initial/final/mobile screenshots, console messages, exceptions, model state and a WebGL capability probe. That environment cannot certify physical GPU throughput or native Windows/macOS behavior.
 
-The suite checks initialization, node creation, dragging, undo/redo, duplicate/delete shortcuts, edge creation across two contacts, corner resizing, grouping/folding, viewport commands, responsive layout and unhandled errors. Additional feature and parity tests remain necessary; this is not validation of every advertised yFiles capability.
+`interaction.py` covers initialization, node creation, dragging, undo/redo, duplicate/delete shortcuts, two-contact edge creation, resizing, grouping/folding, viewport commands and responsive layout.
+
+`editing.py` covers port creation and relocation, explicit-port connections, endpoint reconnection, rejected/canceled drops, connected-port movement, F2 and double-click label dialogs, cancellation, independent-label movement, label-only duplication and owner-retargeting paste. Label coordinates come from the actual shaped text bounds, not a parallel JavaScript layout.
+
+`features.py` exercises all six layouts, routing undo, eight analysis commands, JSON/GraphML/SVG/PNG downloads, a native-format import round trip and all six samples including the 1,000-node graph. The test disables the optional `showOpenFilePicker` capability before initialization to exercise Uno's standard upload-input fallback. Playwright cannot intercept Chromium's native OS file picker. The file bytes still enter through the real browser file input; no graph mutation API or fake import implementation is used. Native OS picker execution remains unverified.
+
+Reports, read-only model state, console messages and screenshots are written to `artifacts/browser-validation`, `artifacts/browser-editing` and `artifacts/browser-features`. A test count is evidence for this project's contracts only; it is not full yFiles parity validation.

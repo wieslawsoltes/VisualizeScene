@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <VisualizeSceneVersion Condition="'$(VisualizeSceneVersion)' == ''">0.1.0</VisualizeSceneVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="VisualizeScene.Core" Version="$(VisualizeSceneVersion)" />
+    <PackageReference Include="VisualizeScene.Editing" Version="$(VisualizeSceneVersion)" />
+    <PackageReference Include="VisualizeScene.Algorithms" Version="$(VisualizeSceneVersion)" />
+    <PackageReference Include="VisualizeScene.Layout" Version="$(VisualizeSceneVersion)" />
+    <PackageReference Include="VisualizeScene.Serialization" Version="$(VisualizeSceneVersion)" />
+    <PackageReference Include="VisualizeScene.Rendering.Skia" Version="$(VisualizeSceneVersion)" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="8.3.1.1" />
+  </ItemGroup>
+</Project>

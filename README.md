@@ -14,6 +14,10 @@ The GitHub Pages workflow deploys the browser artifact only after the main-branc
 
 Select and drag nodes; use corner handles to resize. Drag empty canvas for marquee selection, and Ctrl+click for additive selection. Choose a palette shape and click the canvas to create it. In Edge mode, click a source node or port, then a target. Double-click labels to edit them, or Ctrl+double-click an edge to insert a bend. Group headers can be folded and unfolded.
 
+Drag the circular handles on a selected edge to reconnect its source or target. Invalid drops and Escape leave the original edge unchanged. Add ports through the Edit menu, then drag them or edit their relative coordinates in the inspector. Connection rules are supplied through the reusable `IConnectionPolicy`.
+
+Use **Edit → Add independent label** to annotate a node, edge or port. Independent labels have measured hit areas and can be dragged, edited with F2, duplicated, deleted and nudged. Copy a label, select another owner and paste to retarget it without duplicating the graph. Selecting a label together with its owner moves both once, rather than applying the movement twice.
+
 Mouse-wheel zoom is anchored at the pointer. Middle-button drag or Pan mode moves the viewport. The overview navigates the graph. Small viewports hide side panels so the editor remains usable.
 
 | Shortcut | Action |
@@ -32,7 +36,7 @@ Mouse-wheel zoom is anchored at the pointer. Middle-button drag or Pan mode move
 | `VisualizeScene.Core` | Geometry, immutable graph snapshots, validation, atomic edits, undo/redo, groups, ports, labels, spatial index |
 | `VisualizeScene.Algorithms` | Traversal, connectivity, shortest paths, spanning forests, PageRank, betweenness, coloring, maximum flow |
 | `VisualizeScene.Layout` | Hierarchical, organic, tree, radial, circular and grid layouts; obstacle-aware orthogonal routing |
-| `VisualizeScene.Editing` | Platform-neutral gesture state machine, selection, clipboard, snapping, grouping and alignment |
+| `VisualizeScene.Editing` | Platform-neutral gestures, connection policies, reconnection, port/label editing, selection, clipboard, snapping, grouping and alignment |
 | `VisualizeScene.Serialization` | Versioned JSON, GraphML interchange subset, standalone SVG |
 | `VisualizeScene.Rendering.Skia` | Retained node pictures, shaped text, culling, selection adorners and PNG export |
 | `VisualizeScene.Controls.Uno` | `GraphControl`, `GraphOverview`, `NodePalette`, `GraphPropertyInspector` |
@@ -82,26 +86,29 @@ Requirements: .NET 10 SDK, the WebAssembly workload, and the native requirements
 ```sh
 dotnet workload install wasm-tools
 dotnet run --project tests/VisualizeScene.Tests -c Release
+dotnet run --project tests/VisualizeScene.Editing.Tests -c Release
 dotnet run --project tests/VisualizeScene.Rendering.Tests -c Release
 
 dotnet run --project samples/VisualizeScene.Workbench -f net10.0-desktop
 dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-browserwasm
 ```
 
-For a project-site deployment, publish with `-p:WasmShellBasePath=/VisualizeScene/`. Serve the resulting browser distribution through HTTP; do not open WebAssembly output using `file://`.
+For a project-site deployment, publish with `-p:WasmShellWebAppBasePath=/VisualizeScene/`. Serve the resulting browser distribution through HTTP; do not open WebAssembly output using `file://`.
 
 ```sh
 dotnet pack src/VisualizeScene.Core -c Release -o artifacts/packages
 dotnet pack src/VisualizeScene.Controls.Uno -c Release -o artifacts/packages
 ```
 
-CI builds all reusable package projects and uploads NuGet artifacts. It does not publish packages to nuget.org.
+CI builds all seven package projects and uploads NuGet artifacts. The `package-consumers` job restores them into a temporary directory with a fresh package cache and **no source project references**. It runs the model/editing/layout/analysis/interchange/Skia consumer and compiles a controls consumer for desktop and WebAssembly. Logs and package hashes are uploaded as `package-validation`. Packages are not published to nuget.org.
+
+A standalone Linux rendering host must provide the matching SkiaSharp and HarfBuzz native assets. The package-consumer example supplies `SkiaSharp.NativeAssets.Linux` 3.119.2 and `HarfBuzzSharp.NativeAssets.Linux` 8.3.1.1; Uno applications obtain their platform runtime through Uno. The renderer does not bundle application fonts.
 
 ## Validation and deployment
 
-`Build and validate` runs the core conformance suite and bounded text-layout regressions, builds desktop, publishes the actual Uno WebAssembly application, packages the controls, and runs Playwright pointer/keyboard tests against that application. Artifacts include source, NuGet packages, browser distribution, test reports and screenshots.
+`Build and validate` runs the core conformance, editing/geometry and bounded text-layout regressions, builds desktop, publishes the actual Uno WebAssembly application, packages the controls, and runs Playwright pointer/keyboard tests against that application. Artifacts include source, NuGet packages, browser distribution, test reports and screenshots.
 
-The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. See `tests/browser/interaction.py`. The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
+The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. The three browser suites cover baseline interactions; ports, reconnection and independent labels; and layouts, analysis, exports, file round trips and all sample graphs. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
 
 ## Documentation
 

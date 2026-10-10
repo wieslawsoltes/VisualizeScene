@@ -52,3 +52,18 @@ The workbench is local-first. Graph documents are not sent to a server. Browser 
 - SkiaSharp shaped text API: https://learn.microsoft.com/dotnet/api/skiasharp.harfbuzz.canvasextensions
 
 These sources describe interoperability targets and dependencies, not validation of VisualizeScene's implementation.
+
+
+## Connections, labels and shared scene geometry
+
+`IConnectionPolicy` is the common extension point for creation and reconnection. The default implementation validates ownership, visible and unlocked endpoints, optional explicit-port requirements, direction, capacity, degree, self-loops, parallel connections and directed cycles. Reconnection excludes the old edge from counting and reachability checks. A candidate is only preview state until a valid pointer release; rejection and cancellation do not add undo history.
+
+Independent labels keep an owner ID and an offset. Node anchors use their center, ports use their relative position and edge labels use the midpoint of actual polyline arc length. Compound movement compensates for an owner's changed anchor so selecting an owner and label together never doubles the translation. Label-only copy/duplicate does not duplicate owner nodes. A paste can retain owners or retarget the selected node, edge or port.
+
+`GraphScene` centralizes owner visibility, folded-edge visibility, label anchors and content bounds. The editing session accepts a label-size delegate; the Uno control supplies HarfBuzz measurements from the same renderer that paints labels. Headless clients without a font provider receive a documented estimate. Shaped size caching is bounded, and the control caches content bounds by immutable snapshot. Fit, overview and export include off-node labels and bends. SVG without a measurement delegate uses the same documented headless estimate, not a claim of browser font equivalence.
+
+Geometry hit testing and endpoint clipping use the actual ellipse, polygon or rounded-rectangle shape. Default self-loops use exact explicit ports when present and route around the owner's inflated rectangle; manual bends are preserved. This does not implement obstacle avoidance against other nodes for self-loops.
+
+## Package consumption gate
+
+The package-consumer job downloads the six platform-neutral/rendering packages and the Uno controls package from the same build. It inspects assembly entries and records package hashes. Consumer fixtures are copied outside the repository into a temporary directory with an empty NuGet cache. All VisualizeScene references must resolve as `package`, never `project`, in the generated assets files. The first consumer executes algorithms, editing, interchange, native shaping, caller-owned Skia drawing and a far-label PNG-bound assertion. The second compiles all four reusable controls for both Uno target frameworks. This validates package assembly/dependency wiring; it does not replace real desktop interaction testing.
