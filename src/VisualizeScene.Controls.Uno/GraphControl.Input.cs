@@ -14,6 +14,11 @@ public sealed partial class GraphControl
 {
     private readonly DoubleClickRecognizer clicks = new();
     private bool editingLabel;
+    private TextBox? labelInput;
+    /// <summary>True after the label dialog has opened and transferred focus to its text input.</summary>
+    public bool IsLabelEditorReady { get; private set; }
+    /// <summary>Current dialog text for read-only host status and automation; null when closed.</summary>
+    public string? EditingLabelText => labelInput?.Text;
     private static long ClickTime => (long)(Stopwatch.GetTimestamp() * (1000d / Stopwatch.Frequency));
 
     private static InputModifiers Modifiers()
@@ -72,8 +77,15 @@ public sealed partial class GraphControl
         var value = index.Nodes.TryGetValue(id, out var n) ? n.Text : index.Edges.TryGetValue(id, out var e) ? e.Text : index.Labels[id].Text;
         var input = new TextBox { Text = value, AcceptsReturn = true, MinWidth = 320, MinHeight = 80 }; AutomationProperties.SetAutomationId(input, "LabelText");
         var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Edit label", Content = input, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary };
-        dialog.Opened += (_, _) => { input.Focus(FocusState.Programmatic); input.SelectAll(); };
-        clicks.Reset(); Session.CancelGesture(); editingLabel = true;
+        dialog.Opened += (_, _) =>
+        {
+            // Opening animations can complete after a fast user has already typed.
+            // Do not select over those edits when the Opened event arrives late.
+            var unchanged = input.Text == value;
+            IsLabelEditorReady = input.Focus(FocusState.Programmatic);
+            if (unchanged) input.SelectAll();
+        };
+        clicks.Reset(); Session.CancelGesture(); editingLabel = true; labelInput = input; IsLabelEditorReady = false;
         try
         {
             if (await dialog.ShowAsync() == ContentDialogResult.Primary)
@@ -88,7 +100,7 @@ public sealed partial class GraphControl
             }
         }
         catch (Exception ex) { Error?.Invoke(this, ex.Message); }
-        finally { editingLabel = false; clicks.Reset(); if (!disposed) Focus(FocusState.Programmatic); }
+        finally { editingLabel = false; labelInput = null; IsLabelEditorReady = false; clicks.Reset(); if (!disposed) Focus(FocusState.Programmatic); }
     }
     private async void Key(object sender, KeyRoutedEventArgs args)
     {

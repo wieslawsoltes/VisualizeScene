@@ -73,6 +73,14 @@ with sync_playwright() as p:
         page.mouse.up()
         page.wait_for_timeout(250)
 
+    def type_label(text):
+        # Wait for the real dialog's Opened/focus transition, not a guessed animation duration.
+        wait("v.labelEditor.ready")
+        page.wait_for_function("() => ['TEXTAREA','INPUT'].includes(document.activeElement?.tagName)")
+        page.keyboard.press("Control+a")
+        page.keyboard.type(text, delay=20)
+        wait("v.labelEditor.text === " + json.dumps(text))
+
     def record(name, action):
         started = time.time()
         try:
@@ -81,6 +89,10 @@ with sync_playwright() as p:
             results.append({"name": name, "passed": True, "seconds": time.time()-started})
             print("PASS", name, flush=True)
         except Exception as error:
+            (output/"focus.json").write_text(json.dumps(page.evaluate("""() => ({
+                active: document.activeElement?.outerHTML,
+                inputs: [...document.querySelectorAll('input,textarea')].map(e => ({html:e.outerHTML,value:e.value}))
+            })"""), indent=2))
             results.append({"name": name, "passed": False, "error": str(error)})
             raise
 
@@ -174,9 +186,7 @@ with sync_playwright() as p:
         def edit_label():
             page.mouse.click(*node_point(ids[0]))
             page.keyboard.press("F2")
-            page.wait_for_timeout(300)
-            page.keyboard.press("Control+a")
-            page.keyboard.type("Source system")
+            type_label("Source system")
             page.keyboard.press("Tab")
             page.keyboard.press("Enter")
             wait("v.model.Graph.Nodes[0].Text === 'Source system'")
@@ -185,9 +195,7 @@ with sync_playwright() as p:
 
         def double_click_label():
             page.mouse.dblclick(*node_point(ids[0]), delay=90)
-            page.wait_for_timeout(300)
-            page.keyboard.press("Control+a")
-            page.keyboard.type("Double-click editor")
+            type_label("Double-click editor")
             page.keyboard.press("Tab")
             page.keyboard.press("Enter")
             wait("v.model.Graph.Nodes[0].Text === 'Double-click editor'")
@@ -196,9 +204,7 @@ with sync_playwright() as p:
         def cancel_label():
             revision = state()["revision"]
             page.keyboard.press("F2")
-            page.wait_for_timeout(300)
-            page.keyboard.press("Control+a")
-            page.keyboard.type("Discard this text")
+            type_label("Discard this text")
             page.keyboard.press("Escape")
             page.wait_for_timeout(300)
             assert state()["revision"] == revision
@@ -230,9 +236,7 @@ with sync_playwright() as p:
             b = state()["labelBounds"][label_id]
             page.mouse.click(*screen(b["x"]+b["width"]/2, b["y"]+b["height"]/2))
             page.keyboard.press("F2")
-            page.wait_for_timeout(300)
-            page.keyboard.press("Control+a")
-            page.keyboard.type("Independent annotation")
+            type_label("Independent annotation")
             page.keyboard.press("Tab")
             page.keyboard.press("Enter")
             wait("v.model.Graph.Labels[0].Text === 'Independent annotation'")

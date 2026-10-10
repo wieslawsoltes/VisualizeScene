@@ -45,7 +45,7 @@ public sealed partial class WorkbenchPage
             var b = graph.Session.GetLabelBounds(label);
             return String(label.Id) + $":{{\"x\":{Number(b.X)},\"y\":{Number(b.Y)},\"width\":{Number(b.Width)},\"height\":{Number(b.Height)}}}";
         }));
-        var script = $"globalThis.visualizeSceneState={{ready:{(ready ? "true" : "false")},frames:{frameCount},revision:{document.Revision},mode:'{graph.Session.Mode}',zoom:{Number(graph.Session.Viewport.Zoom)},origin:{{x:{Number(graph.Session.Viewport.Origin.X)},y:{Number(graph.Session.Viewport.Origin.Y)}}},canvas:{Bounds(graph)},controls:{{{controls}}},selection:[{selected}],edgePaths:{{{paths}}},labelBounds:{{{labels}}},error:{String(lastError)},analysis:{String(analysisOutput.Text)},status:{String(status.Text)},model:{model}}};";
+        var script = $"globalThis.visualizeSceneState={{ready:{(ready ? "true" : "false")},frames:{frameCount},revision:{document.Revision},mode:'{graph.Session.Mode}',zoom:{Number(graph.Session.Viewport.Zoom)},origin:{{x:{Number(graph.Session.Viewport.Origin.X)},y:{Number(graph.Session.Viewport.Origin.Y)}}},canvas:{Bounds(graph)},controls:{{{controls}}},selection:[{selected}],edgePaths:{{{paths}}},labelBounds:{{{labels}}},labelEditor:{{ready:{(graph.IsLabelEditorReady ? "true" : "false")},text:{(graph.EditingLabelText is { } labelText ? String(labelText) : "null")}}},error:{String(lastError)},analysis:{String(analysisOutput.Text)},status:{String(status.Text)},model:{model}}};";
         Uno.Foundation.WebAssemblyRuntime.InvokeJS(script);
 #endif
     }
