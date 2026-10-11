@@ -58,6 +58,10 @@ var selectedOptions = new RenderOptions(ShowGrid: false, Selection: editor.Selec
 Measure("render_selected_local", () => renderer.Render(surface.Canvas, graph, viewport, 800, 400, selectedOptions));
 var deletionGraph = new GraphSnapshot(nodes.Take(1000).ToImmutableArray(), [], [], []);
 Measure("delete_1000_nodes", () => { var d = new GraphDocument(); d.Replace(deletionGraph); using var s = new EditorSession(d); s.SelectAll(); s.DeleteSelection(); sink = d.Snapshot; }, samples: 12);
+Measure("align_1000_nodes", () => {
+    var d = new GraphDocument(); d.Replace(deletionGraph); using var session = new EditorSession(d); session.SelectAll();
+    session.Align(Alignment.HorizontalCenter); sink = d.Snapshot;
+}, samples: 20);
 var layoutGraph = new GraphSnapshot(nodes, [], [], []);
 Measure("grid_layout_10000", () => sink = new LayoutEngine().Calculate(layoutGraph, new(LayoutKind.Grid)), samples: 12);
 Measure("label_edit_build", () => { var edit = new GraphEdit(graph); edit.Update(graph.Labels[0] with { Text = "Changed" }); sink = edit.Build(); });

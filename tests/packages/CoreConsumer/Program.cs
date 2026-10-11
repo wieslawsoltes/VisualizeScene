@@ -88,4 +88,14 @@ document.Edit("Rename after save", edit => edit.Update(edit.Node("a") with { Tex
 Check(savePoint.IsDirty, "packaged save-point notices a new snapshot");
 document.Undo();
 Check(!savePoint.IsDirty, "packaged save-point recognizes exact undo");
+var batchSnapshot = document.Snapshot;
+var batch = new GraphPropertySelection(batchSnapshot, ["a", "b"]);
+Check(batch.NodeCount == 2 && batch.Text.IsMixed, "packaged mixed property summary");
+Check(batch.Apply(document, new(Stroke: "#112233"), document.Revision).ChangedItems == 2, "packaged sparse batch edit");
+document.Undo(); Check(ReferenceEquals(batchSnapshot, document.Snapshot), "packaged batch exact undo");
+var alignment = GraphAlignment.Calculate(document.Snapshot, ["a", "b"], Alignment.Top);
+GraphValidation.Validate(alignment.Graph);
+Check(alignment.ExaminedNodes <= 4, "packaged batch alignment traversal");
+session.Select(["a", "b"]); session.PrepareContext();
+Check(session.Selection.Count == 2, "packaged keyboard context preparation");
 Console.WriteLine("Package-only consumer passed; no source project references.");

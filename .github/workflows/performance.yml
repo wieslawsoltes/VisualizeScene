@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          ref: 3e674fe8a27e5495abb06ab50f36cb77df7862b6
+          ref: b5999bc6419aad120e53994b6fece8b3f30ebdcf
           path: comparison-baseline
       - uses: actions/setup-dotnet@v4
         with:
@@ -49,7 +49,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/benchmark-before" "$RUNNER_TEMP/benchmark-after" artifacts/benchmarks
           cp tests/benchmarks/Benchmark.csproj tests/benchmarks/Program.cs "$RUNNER_TEMP/benchmark-before/"
           cp tests/benchmarks/Benchmark.csproj tests/benchmarks/Program.cs "$RUNNER_TEMP/benchmark-after/"
-          dotnet run --project "$RUNNER_TEMP/benchmark-before/Benchmark.csproj" -c Release -p:SourceRoot="$GITHUB_WORKSPACE/comparison-baseline" -- "$GITHUB_WORKSPACE/artifacts/benchmarks/baseline.json" 3e674fe8a27e5495abb06ab50f36cb77df7862b6
+          dotnet run --project "$RUNNER_TEMP/benchmark-before/Benchmark.csproj" -c Release -p:SourceRoot="$GITHUB_WORKSPACE/comparison-baseline" -- "$GITHUB_WORKSPACE/artifacts/benchmarks/baseline.json" b5999bc6419aad120e53994b6fece8b3f30ebdcf
           dotnet run --project "$RUNNER_TEMP/benchmark-after/Benchmark.csproj" -c Release -p:SourceRoot="$GITHUB_WORKSPACE" -- "$GITHUB_WORKSPACE/artifacts/benchmarks/current.json" "$(git rev-parse HEAD)"
           python tests/benchmarks/compare.py artifacts/benchmarks
       - uses: actions/upload-artifact@v4
