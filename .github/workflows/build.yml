@@ -118,6 +118,9 @@ jobs:
       - name: Browser graph Find and Replace
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/search.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Browser classic workspace controls
+        if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
+        run: python tests/browser/workspace.py http://127.0.0.1:8080/VisualizeScene/?test=1
       - name: Browser layouts, analysis, exports and samples
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/features.py http://127.0.0.1:8080/VisualizeScene/?test=1
@@ -166,6 +169,12 @@ jobs:
         with:
           name: browser-search
           path: artifacts/browser-search
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-workspace
+          path: artifacts/browser-workspace
 
   package-consumers:
     needs: [core, app]
