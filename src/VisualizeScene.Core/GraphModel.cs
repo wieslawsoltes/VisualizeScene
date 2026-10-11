@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
@@ -35,21 +34,20 @@ public sealed class GraphIndex
     private static readonly ConditionalWeakTable<GraphSnapshot, Lazy<GraphIndex>> indexes = new();
     private readonly Dictionary<string, IReadOnlyList<GraphEdge>> outgoing, incoming;
     private readonly Dictionary<string, IReadOnlyList<GraphNode>> children;
-    private readonly Dictionary<string, string> representatives = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, int> depths = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> representatives;
+    private readonly Dictionary<string, int> depths;
     private readonly ConcurrentDictionary<string, IReadOnlyList<PointD>> edgePaths = new(StringComparer.Ordinal);
     // Weak, identity-keyed entries do not attach mutable state to record equality or keep old revisions alive.
     internal static GraphIndex ForSnapshot(GraphSnapshot graph) => indexes.GetValue(graph,
         static key => new Lazy<GraphIndex>(() => new GraphIndex(key), LazyThreadSafetyMode.ExecutionAndPublication)).Value;
     public GraphIndex(GraphSnapshot graph)
     {
-        GraphValidation.Validate(graph); Graph = graph;
-        Nodes = new ReadOnlyDictionary<string, GraphNode>(graph.Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal));
-        Edges = new ReadOnlyDictionary<string, GraphEdge>(graph.Edges.ToDictionary(e => e.Id, StringComparer.Ordinal));
-        Ports = new ReadOnlyDictionary<string, GraphPort>(graph.Ports.ToDictionary(p => p.Id, StringComparer.Ordinal));
-        Labels = new ReadOnlyDictionary<string, GraphLabel>(graph.Labels.ToDictionary(l => l.Id, StringComparer.Ordinal));
+        var identity = GraphValidation.Identity(graph); Graph = graph;
+        Nodes = identity.Nodes; Edges = identity.Edges; Ports = identity.Ports; Labels = identity.Labels;
         outgoing = Group(graph.Edges, e => e.SourceId); incoming = Group(graph.Edges, e => e.TargetId);
         children = Group(graph.Nodes.Where(n => n.ParentId is not null), n => n.ParentId!);
+        representatives = new(graph.Nodes.Length, StringComparer.Ordinal);
+        depths = new(graph.Nodes.Length, StringComparer.Ordinal);
         var queue = new Queue<(GraphNode Node, int Depth, string? Collapsed)>();
         foreach (var node in graph.Nodes) if (node.ParentId is null) queue.Enqueue((node, 0, null));
         while (queue.TryDequeue(out var entry))
@@ -60,8 +58,18 @@ public sealed class GraphIndex
         }
     }
     private static Dictionary<string, IReadOnlyList<T>> Group<T>(IEnumerable<T> values, Func<T, string> key)
-        => values.GroupBy(key, StringComparer.Ordinal).ToDictionary(g => g.Key,
-            g => (IReadOnlyList<T>)Array.AsReadOnly(g.ToArray()), StringComparer.Ordinal);
+    {
+        var buckets = new Dictionary<string, List<T>>(StringComparer.Ordinal);
+        foreach (var item in values)
+        {
+            var id = key(item);
+            if (!buckets.TryGetValue(id, out var list)) buckets.Add(id, list = new(1));
+            list.Add(item);
+        }
+        var result = new Dictionary<string, IReadOnlyList<T>>(buckets.Count, StringComparer.Ordinal);
+        foreach (var pair in buckets) result.Add(pair.Key, pair.Value.AsReadOnly());
+        return result;
+    }
     private IReadOnlyList<T> Lookup<T>(Dictionary<string, IReadOnlyList<T>> values, string id)
     {
         if (!Nodes.ContainsKey(id)) throw new KeyNotFoundException(id);
@@ -88,7 +96,10 @@ public sealed class GraphIndex
         ArgumentNullException.ThrowIfNull(edge);
         // Preview edges can share an ID with this revision; never return the stored route for a replacement record.
         if (Edges.TryGetValue(edge.Id, out var stored) && ReferenceEquals(stored, edge))
-            return edgePaths.GetOrAdd(edge.Id, _ => FreezePath(edge));
+        {
+            if (edgePaths.TryGetValue(edge.Id, out var cached)) return cached;
+            return edgePaths.GetOrAdd(edge.Id, FreezePath(edge));
+        }
         return FreezePath(edge);
     }
     private IReadOnlyList<PointD> FreezePath(GraphEdge edge)
@@ -127,65 +138,4 @@ public sealed class GraphIndex
         var x = (start.X + end.X) / 2;
         return [start, new(x, start.Y), new(x, end.Y), end];
     }
-}
-
-public static class GraphValidation
-{
-    private sealed class Validated { }
-    private static readonly ConditionalWeakTable<GraphSnapshot, Validated> validated = new();
-    public static void Validate(GraphSnapshot graph)
-    {
-        ArgumentNullException.ThrowIfNull(graph);
-        validated.GetValue(graph, static snapshot => { ValidateCore(snapshot); return new(); });
-    }
-    private static void ValidateCore(GraphSnapshot graph)
-    {
-        if (graph.Nodes.IsDefault || graph.Edges.IsDefault || graph.Ports.IsDefault || graph.Labels.IsDefault)
-            throw new ArgumentException("Graph collections must be initialized.");
-        var ids = new HashSet<string>(StringComparer.Ordinal);
-        void Id(string id) { if (string.IsNullOrWhiteSpace(id) || id.Length > 1024 || !ids.Add(id)) throw new ArgumentException($"Invalid or duplicate ID: {id}"); }
-        foreach (var n in graph.Nodes)
-        {
-            Id(n.Id);
-            if (!n.Bounds.IsValid || !double.IsFinite(n.Bounds.Right) || !double.IsFinite(n.Bounds.Bottom) || n.Bounds.Width < 1 || n.Bounds.Height < 1 || !Enum.IsDefined(n.Shape)) throw new ArgumentException($"Invalid node geometry: {n.Id}");
-            if (n.Collapsed && !n.IsGroup) throw new ArgumentException("Only groups can be collapsed.");
-            if (n.Text is null || !ValidColor(n.Fill) || !ValidColor(n.Stroke)) throw new ArgumentException("Invalid node style.");
-        }
-        var nodes = graph.Nodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
-        var done = new HashSet<string>();
-        foreach (var node in graph.Nodes)
-        {
-            var path = new HashSet<string>();
-            for (var n = node; !done.Contains(n.Id);)
-            {
-                if (!path.Add(n.Id)) throw new ArgumentException("Group hierarchy cannot contain a cycle.");
-                if (n.ParentId is null) break;
-                if (!nodes.TryGetValue(n.ParentId, out var parent) || !parent.IsGroup) throw new ArgumentException("A parent must be an existing group.");
-                n = parent;
-            }
-            done.UnionWith(path);
-        }
-        foreach (var p in graph.Ports)
-        {
-            Id(p.Id);
-            if (!nodes.ContainsKey(p.NodeId) || !p.RelativeLocation.IsFinite || p.RelativeLocation.X < 0 || p.RelativeLocation.X > 1 || p.RelativeLocation.Y < 0 || p.RelativeLocation.Y > 1) throw new ArgumentException("Invalid port.");
-        }
-        var ports = graph.Ports.ToDictionary(p => p.Id);
-        foreach (var e in graph.Edges)
-        {
-            Id(e.Id);
-            if (!nodes.ContainsKey(e.SourceId) || !nodes.ContainsKey(e.TargetId)) throw new ArgumentException("Dangling edge endpoint.");
-            if (!double.IsFinite(e.Weight) || !Enum.IsDefined(e.Routing) || !ValidColor(e.Stroke) || e.Text is null) throw new ArgumentException("Invalid edge data.");
-            if (!e.Bends.IsDefault && e.Bends.Any(p => !p.IsFinite)) throw new ArgumentException("Non-finite bend.");
-            if (e.SourcePortId is not null && (!ports.TryGetValue(e.SourcePortId, out var sp) || sp.NodeId != e.SourceId)) throw new ArgumentException("Source port owner mismatch.");
-            if (e.TargetPortId is not null && (!ports.TryGetValue(e.TargetPortId, out var tp) || tp.NodeId != e.TargetId)) throw new ArgumentException("Target port owner mismatch.");
-        }
-        var owners = ids.ToHashSet();
-        foreach (var label in graph.Labels)
-        {
-            Id(label.Id);
-            if (!owners.Contains(label.OwnerId) || label.Text is null || !label.Offset.IsFinite || !double.IsFinite(label.FontSize) || label.FontSize <= 0 || label.FontSize > 512) throw new ArgumentException("Invalid label.");
-        }
-    }
-    public static bool ValidColor(string? color) => color is { Length: 7 } && color[0] == '#' && color.Skip(1).All(Uri.IsHexDigit);
 }
