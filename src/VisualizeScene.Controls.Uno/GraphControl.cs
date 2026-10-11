@@ -40,8 +40,8 @@ public sealed partial class GraphControl : ContentControl, IDisposable
         get => document;
         set
         {
-            ArgumentNullException.ThrowIfNull(value); if (ReferenceEquals(document, value)) return;
-            var previous = document; CancelTouchNavigation(); Session.Dispose(); document = value; Session = new(value); Attach();
+            ObjectDisposedException.ThrowIf(disposed, this); ArgumentNullException.ThrowIfNull(value); if (ReferenceEquals(document, value)) return;
+            var previous = document; CloseGraphContextMenu(); CancelTouchNavigation(); Session.Dispose(); document = value; Session = new(value); Attach();
             DocumentChanged?.Invoke(this, new(previous, value)); Invalidate();
         }
     }
@@ -55,16 +55,16 @@ public sealed partial class GraphControl : ContentControl, IDisposable
         PointerPressed += Pressed; PointerMoved += Moved; PointerReleased += Released; PointerCanceled += Canceled;
         PointerCaptureLost += CaptureLost;
         LostFocus += (_, _) => { showKeyboardFocus = false; CancelTouchNavigation(); };
-        Unloaded += (_, _) => CancelTouchNavigation();
+        Unloaded += (_, _) => { CloseGraphContextMenu(); CancelTouchNavigation(); };
         PointerWheelChanged += Wheel; // Native double-tap can span different editor modes; recognition happens on completed clicks.
         DoubleTapped += (_, args) => args.Handled = true; KeyDown += Key; SizeChanged += (_, _) => Invalidate();
-        RightTapped += (_, args) => { ContextMenu().ShowAt(this, args.GetPosition(this)); args.Handled = true; };
+        RightTapped += (_, args) => { var p = args.GetPosition(this); Run(() => ShowGraphContextMenu(new(p.X, p.Y))); args.Handled = true; };
     }
     private void Attach()
     {
         AttachNavigation();
         Session.LabelSizeProvider = label => renderer.MeasureLabel(label);
-        Session.Invalidated += (_, _) => Invalidate(); Session.SelectionChanged += (_, _) => SelectionChanged?.Invoke(this, EventArgs.Empty); Session.StatusChanged += (_, text) => StatusChanged?.Invoke(this, text);
+        Session.Invalidated += (_, _) => Invalidate(); Session.SelectionChanged += (_, _) => { CloseGraphContextMenu(); SelectionChanged?.Invoke(this, EventArgs.Empty); }; Session.StatusChanged += (_, text) => { CloseGraphContextMenu(); StatusChanged?.Invoke(this, text); };
     }
     public void Invalidate() { if (!disposed) surface.Invalidate(); }
     private void Run(Action action) { try { action(); } catch (Exception ex) { Error?.Invoke(this, ex.Message); } }
@@ -78,7 +78,7 @@ public sealed partial class GraphControl : ContentControl, IDisposable
     public byte[] ExportPng(double scale = 1) => renderer.ExportPng(Document.Snapshot, scale);
     public new void Dispose()
     {
-        if (disposed) return; CancelTouchNavigation(); disposed = true;
+        if (disposed) return; CloseGraphContextMenu(); CancelTouchNavigation(); disposed = true;
         if (inputDocument is not null) inputDocument.Changed -= InputDocumentChanged;
         Session.Dispose(); renderer.Dispose(); customTypeface?.Dispose(); customTypeface = null;
     }

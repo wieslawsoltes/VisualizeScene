@@ -77,7 +77,7 @@ public sealed class GraphStructureView : UserControl, IDisposable
         var graph = target.Document.Snapshot.Index();
         if (graph.Labels.TryGetValue(id, out var label)) id = label.OwnerId;
         if (graph.Ports.TryGetValue(id, out var port)) id = port.NodeId;
-        if (!positions.TryGetValue(id, out var position)) return;
+        if (!positions.TryGetValue(id, out var position)) { binding = true; list.SelectedIndex = -1; binding = false; return; }
         binding = true; list.SelectedIndex = position; binding = false;
     }
     private void Rebind(object? sender, GraphDocumentChangedEventArgs args)
@@ -86,7 +86,9 @@ public sealed class GraphStructureView : UserControl, IDisposable
     {
         if (target is null) { index = null; rows = []; positions.Clear(); list.ItemsSource = null; count.Text = "No graph"; return; }
         var graph = target.Document.Snapshot;
-        if (!ReferenceEquals(index?.Snapshot, graph)) { index = new(graph); IndexBuilds++; }
+        // Rows depend only on node records and hierarchy, not edge/port/label edits.
+        if (index is not null && index.Snapshot.Nodes == graph.Nodes) { Selected(this, EventArgs.Empty); return; }
+        index = new(graph); IndexBuilds++;
         var identities = graph.Index().Nodes; collapsed.RemoveWhere(id => !identities.ContainsKey(id));
         BindRows(SelectedId); Selected(this, EventArgs.Empty);
     }

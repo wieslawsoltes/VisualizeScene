@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import traceback
+import subprocess
 from playwright.sync_api import sync_playwright
 
 url = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8080/VisualizeScene/?test=1'
@@ -97,4 +98,7 @@ with sync_playwright() as p:
             except Exception:pass
         (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno app, real input; SwiftShader is software rendering.'},indent=2))
         browser.close()
-sys.exit(1 if errors else 0)
+if errors:
+    sys.exit(1)
+# Use a fresh browser/fixture for batch and context scenarios, sharing the same compiled site.
+sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("batch.py")), url], check=False).returncode)
