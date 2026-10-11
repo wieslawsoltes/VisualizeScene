@@ -82,4 +82,10 @@ Check(searchResult.Matches.Length == 1 && searchResult.Matches[0].ItemId == "a",
 var searchSnapshot = document.Snapshot;
 Check(searchResult.Replace(document, "Begin", expectedRevision: document.Revision).ChangedItems == 1, "packaged atomic text replacement");
 document.Undo(); Check(ReferenceEquals(searchSnapshot, document.Snapshot), "packaged replacement preserves exact undo");
+var savePoint = new GraphSavePoint(document);
+Check(!savePoint.IsDirty, "packaged save-point starts clean");
+document.Edit("Rename after save", edit => edit.Update(edit.Node("a") with { Text = "Unsaved" }));
+Check(savePoint.IsDirty, "packaged save-point notices a new snapshot");
+document.Undo();
+Check(!savePoint.IsDirty, "packaged save-point recognizes exact undo");
 Console.WriteLine("Package-only consumer passed; no source project references.");

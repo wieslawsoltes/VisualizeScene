@@ -16,11 +16,11 @@ public sealed partial class WorkbenchPage
     }
     private async Task NewGraph()
     {
-        await RunAsync(async () => { if (!await ConfirmDiscard()) return; document.Replace(GraphSnapshot.Empty, "New graph", true); graph.Session.Select([]); graph.SetMode(EditorMode.Select); currentName = "Untitled"; dirty = false; graph.Fit(); });
+        await RunAsync(async () => { if (!await ConfirmDiscard()) return; document.Replace(GraphSnapshot.Empty, "New graph", true); graph.Session.Select([]); graph.SetMode(EditorMode.Select); currentName = "Untitled"; savePoint.MarkSaved(); graph.Fit(); });
     }
     private void LoadExample(string name)
     {
-        Run(() => { layoutCancellation?.Cancel(); document.Replace(SampleGraphs.Create(name), "Load " + name, true); currentName = name; dirty = false; graph.Session.Select([]); graph.SetMode(EditorMode.Select); graph.Fit(); lastError = ""; });
+        Run(() => { layoutCancellation?.Cancel(); document.Replace(SampleGraphs.Create(name), "Load " + name, true); currentName = name; savePoint.MarkSaved(); graph.Session.Select([]); graph.SetMode(EditorMode.Select); graph.Fit(); lastError = ""; });
     }
     private async Task ApplyLayout()
     {

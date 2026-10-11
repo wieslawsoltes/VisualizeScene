@@ -84,6 +84,8 @@ with sync_playwright() as p:
         page.set_viewport_size({'width':1440,'height':1050});wait('w.leftVisible&&w.rightVisible')
         assert state()['model']==before
         record('Responsive layout restores side rails without changing graph content')
+        import inspector
+        inspector.run(page, state, ws, wait, click, record, out)
         assert not errors, errors
     except Exception as e:
         traceback.print_exc();errors.append(str(e))

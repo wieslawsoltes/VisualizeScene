@@ -101,6 +101,7 @@ public sealed partial class WorkbenchPage
         if (paintedMode != graph.Session.Mode)
         {
             paintedMode = graph.Session.Mode;
+            modeText.Text = paintedMode switch { EditorMode.CreateNode => "Create node", EditorMode.CreateEdge => "Create edge", EditorMode.Pan => "Pan", _ => "Select" };
             foreach (var pair in modeButtons) { pair.Value.Background = Brush(pair.Key == paintedMode ? "#D6E8FB" : "#F8F8F8"); pair.Value.BorderBrush = Brush(pair.Key == paintedMode ? "#6599C9" : "#D9DDE1"); }
         }
         if (testControls.GetValueOrDefault("Undo") is Control undo) undo.IsEnabled = document.CanUndo;

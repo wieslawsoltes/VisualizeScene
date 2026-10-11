@@ -28,15 +28,18 @@ public sealed partial class WorkbenchPage : Page
     private readonly Border leftRail, rightRail;
     private CancellationTokenSource? layoutCancellation;
     private int frameCount;
-    private bool ready, dirty, loaded;
+    private bool ready, loaded;
+    private readonly GraphSavePoint savePoint;
+    private bool dirty => savePoint.IsDirty;
     private string currentName = "Order processing", lastError = "";
     private readonly Dictionary<string, FrameworkElement> testControls = [];
     private DispatcherTimer? diagnosticTimer;
 
     public WorkbenchPage()
     {
+        savePoint = new(document);
         RequestedTheme = ElementTheme.Light; Background = Brush("#F1F3F5"); graph.Document = document; overview.Target = graph; inspector.Target = graph; search.Target = graph; structure.Target = graph;
-        document.Replace(SampleGraphs.Flowchart(), clearHistory: true);
+        document.Replace(SampleGraphs.Flowchart(), clearHistory: true); savePoint.MarkSaved();
         var root = new Grid(); root.RowDefinitions.Add(new() { Height = GridLength.Auto }); root.RowDefinitions.Add(new() { Height = GridLength.Auto }); root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height = new(27) });
         var menu = BuildMenu(); AddSearchMenu(menu); AddWorkspaceMenu(menu); root.Children.Add(menu); var toolbar = BuildToolbar(); Grid.SetRow(toolbar, 1); root.Children.Add(toolbar);
         leftRail = BuildLeft(); rightRail = BuildRight(); workspace.LeftContent = leftRail; workspace.RightContent = rightRail;
@@ -47,7 +50,7 @@ public sealed partial class WorkbenchPage : Page
         var footer = new Grid { Background = Brush("#E7ECF2"), Padding = new(10, 0, 10, 0) };
         footer.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         footer.Children.Add(status); modeText.Margin = new(18, 0, 18, 0); Grid.SetColumn(modeText, 1); footer.Children.Add(modeText); Grid.SetColumn(counts, 2); footer.Children.Add(counts); Grid.SetRow(footer, 3); root.Children.Add(footer); Content = root;
-        document.Changed += (_, args) => { dirty = true; status.Text = args.Operation; UpdateStatus(); PublishTestState(); };
+        document.Changed += (_, args) => { status.Text = args.Operation; UpdateStatus(); PublishTestState(); };
         graph.SelectionChanged += (_, _) => { UpdateStatus(); PublishTestState(); };
         graph.Error += (_, text) => Report(text); graph.StatusChanged += (_, text) => status.Text = text;
         graph.FrameRendered += (_, _) => { frameCount++; UpdateChrome(); PublishTestState(); };
@@ -55,7 +58,7 @@ public sealed partial class WorkbenchPage : Page
         {
             if (loaded) return; loaded = true;
             await RunAsync(() => graph.LoadTypefaceAsync(new Uri("ms-appx:///Uno.Fonts.OpenSans/Fonts/OpenSans-Regular.ttf")));
-            await Task.Delay(100); graph.Fit(); ready = true; dirty = false; UpdateStatus(); StartDiagnostics(); if (diagnosticTimer is not null) diagnosticTimer.Tick += (_, _) => PublishWorkspaceState(); PublishTestState(); PublishWorkspaceState();
+            await Task.Delay(100); graph.Fit(); ready = true; UpdateStatus(); StartDiagnostics(); if (diagnosticTimer is not null) diagnosticTimer.Tick += (_, _) => PublishWorkspaceState(); PublishTestState(); PublishWorkspaceState();
         };
         samples.SelectionChanged += async (_, _) => { if (samples.SelectedItem is string name && name != currentName) { if (await ConfirmDiscard()) LoadExample(name); else samples.SelectedItem = currentName; } };
         Unloaded += (_, _) => { diagnosticTimer?.Stop(); layoutCancellation?.Cancel(); search.Dispose(); structure.Dispose(); inspector.Dispose(); overview.Dispose(); graph.Dispose(); };
