@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
+using RuntimeInformation = System.Runtime.InteropServices.RuntimeInformation;
 using System.Security.Cryptography;
 using System.Text.Json;
 using SkiaSharp;
