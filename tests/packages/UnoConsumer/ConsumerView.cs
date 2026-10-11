@@ -16,6 +16,9 @@ public sealed class ConsumerView : UserControl, IDisposable
         var document = new GraphDocument();
         document.Edit("Create", edit => edit.Add(new GraphNode("n", new(0, 0, 140, 70), "Package consumer")));
         graph.Document = document;
+        graph.TouchMode = GraphTouchMode.Navigate;
+        graph.NavigateBoundary();
+        graph.EnsureFocusedItemVisible();
         graph.Session.ConnectionPolicy = new ConnectionPolicy { AllowParallelEdges = false };
         graph.Session.AddLabel("n", "Annotation");
         overview = new GraphOverview { Target = graph };

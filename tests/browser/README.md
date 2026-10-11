@@ -43,3 +43,22 @@ python tests/browser/selection.py 'http://127.0.0.1:8080/VisualizeScene/?test=1'
 ```
 
 Their evidence is uploaded as `browser-placement` and `browser-selection`. A passing source build is not a substitute for these actual input tests.
+
+## Navigation and large-document checks
+
+`navigation.py` drives Chromium's native touch-input dispatch and actual keyboard/menu
+commands against the compiled Uno app. It verifies pan/pinch, tap selection, deferred
+creation, edit arbitration, cancellation and spatial focus/reveal. This is input
+emulation, not physical touchscreen certification.
+
+`performance.py` uploads 10,000 nodes, 9,900 edges, 10,000 ports and 10,000 labels through
+the real file picker. It checks that zoom/pan retain graph data and preparation,
+that annotation queries inspect a small viewport subset, and that an actual edit
+invalidates the diagnostic document cache exactly once. It uses structural counters,
+not an FPS claim or hardware-GPU benchmark. Reports are uploaded as
+`browser-navigation` and `browser-performance`.
+
+```sh
+python tests/browser/navigation.py 'http://127.0.0.1:8080/VisualizeScene/?test=1'
+python tests/browser/performance.py 'http://127.0.0.1:8080/VisualizeScene/?test=1'
+```

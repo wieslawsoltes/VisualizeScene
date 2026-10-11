@@ -37,6 +37,25 @@ Node movement and resize corners snap to nearby node boundaries or centers, with
 
 The **Selection** menu filters nodes, edges, ports, labels or groups, inverts/clears the selection and expands incoming/outgoing neighbors. Marquee modes are intersecting, fully contained, or directional: drag right for a containment window and left for crossing selection. A solid blue rectangle indicates containment; a dashed green rectangle indicates crossing. Dragging previews highlights without changing the committed selection until release. Escape restores the original selection. Shift adds, Control toggles and Control+Shift subtracts. Ctrl+I inverts; Ctrl+Shift+A clears.
 
+### Touch, spatial navigation and performance
+
+**View → Touch input** offers Navigate, Edit and Disabled modes. One finger can pan
+or edit; two fingers navigate with centroid-preserving pinch zoom. A second contact
+cancels an edit preview before taking over navigation. Node/edge creation waits for
+a completed tap. Ctrl+Arrow navigates graph items; Ctrl+Shift+Arrow extends selection;
+Ctrl+Home/End visits reading-order boundaries. Page keys pan without editing.
+
+The implementation shares immutable graph indexes across consumers, memoizes visible
+group ancestry and routes, uses copy-on-write edit collections, and spatially queries
+pointer hits, visible labels and ports. Unchanged renderer paths and indexes are
+reused where their inputs did not change. The test diagnostics cache document data
+separately from per-frame view state.
+
+[Navigation contracts](docs/navigation.md) and [performance methodology](docs/performance.md)
+describe the APIs, validation and limits. Same-runner benchmark reports compare the
+current implementation with pinned baseline commit `894cd8e8`; they are CPU/raster
+measurements, not physical-GPU throughput or a promise of fixed frame rates.
+
 ## Reusable packages
 
 | Package | Contents |
@@ -97,6 +116,9 @@ dotnet run --project tests/VisualizeScene.Tests -c Release
 dotnet run --project tests/VisualizeScene.Editing.Tests -c Release
 dotnet run --project tests/VisualizeScene.Rendering.Tests -c Release
 dotnet run --project tests/VisualizeScene.Parity.Tests -c Release
+dotnet run --project tests/VisualizeScene.Navigation.Tests -c Release
+# Linux native Skia/HarfBuzz assets are supplied by the performance test project:
+dotnet run --project tests/VisualizeScene.Performance.Tests -c Release
 
 dotnet run --project samples/VisualizeScene.Workbench -f net10.0-desktop
 dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-browserwasm
@@ -117,7 +139,7 @@ A standalone Linux rendering host must provide the matching SkiaSharp and HarfBu
 
 `Build and validate` runs core conformance, editing/geometry, placement/snapping/selection and bounded text-layout regressions, builds desktop, publishes the actual Uno WebAssembly application, packages the controls, and runs Playwright pointer/keyboard tests against that application. Artifacts include source, NuGet packages, browser distribution, test reports and screenshots.
 
-The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. Five browser suites cover baseline interactions; ports, reconnection and independent labels; automatic placement and snapping; advanced selection; and layouts, analysis, exports, file round trips and all sample graphs. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
+The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. Seven browser suites cover baseline interactions; ports, reconnection and independent labels; automatic placement and snapping; advanced selection; touch/keyboard navigation; a 10,000-node performance fixture; and layouts, analysis, exports, file round trips and all sample graphs. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
 
 ## Documentation
 

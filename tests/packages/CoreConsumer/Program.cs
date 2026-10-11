@@ -41,6 +41,15 @@ session.SelectArea(new RectD(-10000, -10000, 20000, 20000), kinds: SelectionKind
 Check(session.Selection.Contains(labelId), "measured area-selection API from package");
 session.SelectNeighbors(NeighborDirection.Both);
 Check(session.Selection.Contains("a") && session.Selection.Contains("b"), "topology selection API from package");
+var view = new Viewport();
+var navigation = new TouchNavigator(view);
+navigation.Press(1, new(100, 100), 0); navigation.Press(2, new(200, 100), 1);
+navigation.Move(1, new(50, 100)); navigation.Move(2, new(250, 100));
+Check(view.Zoom == 2, "packaged two-contact navigation transforms the view");
+Check(navigation.Release(1, new(50, 100), 10).Tracked && !navigation.Release(2, new(250, 100), 20).IsTap,
+    "packaged pinch cannot become a tap");
+session.NavigateBoundary();
+Check(session.FocusedItemId is not null && session.FocusedItemBounds.HasValue, "packaged keyboard focus and bounds");
 var before = document.Snapshot;
 session.MoveLabel(labelId, new(850, 650)); document.Undo();
 Check(GraphIO.ToJson(document.Snapshot) == GraphIO.ToJson(before), "editing package preserves exact undo");
