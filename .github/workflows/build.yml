@@ -31,6 +31,8 @@ jobs:
         run: dotnet run --project tests/VisualizeScene.Performance.Tests -c Release
       - name: Graph search and cold-index contracts
         run: dotnet run --project tests/VisualizeScene.Search.Tests -c Release
+      - name: Overview rendering and structure contracts
+        run: dotnet run --project tests/VisualizeScene.Workspace.Tests -c Release
       - name: Build reusable packages
         run: |
           mkdir -p artifacts/packages

@@ -1,0 +1,30 @@
+name: Workspace and overview contracts
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: workspace-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Overview rendering and structure contracts
+        run: dotnet run --project tests/VisualizeScene.Workspace.Tests -c Release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workspace-contracts
+          path: |
+            artifacts/validation/workspace.xml
+            artifacts/overview-benchmark
+          if-no-files-found: error
