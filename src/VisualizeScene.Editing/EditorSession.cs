@@ -184,8 +184,8 @@ public sealed partial class EditorSession : IDisposable
         else if (drag.Kind == HitKind.ResizeHandle)
         {
             var n = index.Nodes[drag.Id!]; var p = SnapResizePoint(world); var b = n.Bounds;
-            var opposite = drag.Part switch { 0 => new PointD(b.Right, b.Bottom), 1 => new(b.X, b.Bottom), 2 => new(b.X, b.Y), _ => new(b.Right, b.Y) };
-            var rect = RectD.FromPoints(opposite, p); if (rect.Width < 20 || rect.Height < 20) AlignmentGuides = []; rect = rect with { Width = Math.Max(20, rect.Width), Height = Math.Max(20, rect.Height) };
+            var rect = ResizeBounds(b, p, drag.Part);
+            if (rect.Width == 20 || rect.Height == 20) AlignmentGuides = [];
             edit.Update(n with { Bounds = rect });
         }
         else if (drag.Kind == HitKind.Bend)
@@ -226,7 +226,7 @@ public sealed partial class EditorSession : IDisposable
     }
     public void DeleteSelection()
     {
-        var ids = selection.ToArray(); Document.Edit("Delete selection", edit => { foreach (var id in ids) edit.Remove(id); }); Select([]);
+        var ids = selection.ToArray(); Document.Edit("Delete selection", edit => edit.RemoveRange(ids)); Select([]);
     }
     public GraphSnapshot Copy()
     {
@@ -270,26 +270,5 @@ public sealed partial class EditorSession : IDisposable
         var edge = index.Edges[edgeId]; var path = paths[edgeId]; var nearest = Enumerable.Range(1, path.Count - 1).MinBy(i => Geometry.DistanceToSegment(world, path[i - 1], path[i]));
         var bends = path.Skip(1).Take(path.Count - 2).ToList(); bends.Insert(nearest - 1, Snap(world));
         Document.Edit("Insert bend", edit => edit.Update(edge with { Bends = bends.ToImmutableArray() })); Select([edgeId]);
-    }
-    public void Align(Alignment alignment)
-    {
-        var nodes = selection.Where(index.Nodes.ContainsKey).Select(id => index.Nodes[id]).Where(n => !n.Locked).ToArray(); if (nodes.Length < 2) return;
-        var bounds = RectD.Enclose(nodes.Select(n => n.Bounds)); var ordered = nodes.OrderBy(n => alignment == Alignment.DistributeVertical ? n.Bounds.Y : n.Bounds.X).ToArray();
-        var gap = alignment == Alignment.DistributeVertical ? (bounds.Height - nodes.Sum(n => n.Bounds.Height)) / (nodes.Length - 1) : (bounds.Width - nodes.Sum(n => n.Bounds.Width)) / (nodes.Length - 1);
-        var cursor = alignment == Alignment.DistributeVertical ? bounds.Y : bounds.X;
-        Document.Edit("Align nodes", edit =>
-        {
-            foreach (var node in ordered)
-            {
-                var b = node.Bounds;
-                var target = alignment switch
-                {
-                    Alignment.Left => b with { X = bounds.X }, Alignment.HorizontalCenter => b with { X = bounds.Center.X - b.Width / 2 }, Alignment.Right => b with { X = bounds.Right - b.Width },
-                    Alignment.Top => b with { Y = bounds.Y }, Alignment.VerticalCenter => b with { Y = bounds.Center.Y - b.Height / 2 }, Alignment.Bottom => b with { Y = bounds.Bottom - b.Height },
-                    Alignment.DistributeHorizontal => b with { X = cursor }, Alignment.DistributeVertical => b with { Y = cursor }, _ => b
-                };
-                edit.Move([node.Id], new(target.X - b.X, target.Y - b.Y)); cursor += (alignment == Alignment.DistributeVertical ? b.Height : b.Width) + gap;
-            }
-        });
     }
 }
