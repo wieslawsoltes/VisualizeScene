@@ -25,10 +25,11 @@ public sealed partial class EditorSession
         hitHandles.Sort((a, b) => handleOrder[a].CompareTo(handleOrder[b]));
         LastHandleCandidateCount = hitHandles.Count;
     }
-    private Dictionary<string, int> nodeOrder = [], portOrder = [], labelOrder = [];
+    private Dictionary<string, int> nodeOrder = [], portOrder = [], labelOrder = [], edgeOrder = [];
     public HitTestStatistics LastHitStatistics { get; private set; }
     private void ReindexHitOrder()
     {
+        edgeOrder = Document.Snapshot.Edges.Select((e, i) => (e.Id, i)).ToDictionary(p => p.Id, p => p.i, StringComparer.Ordinal);
         nodeOrder = Document.Snapshot.Nodes.Select((n, i) => (n.Id, i)).ToDictionary(p => p.Id, p => p.i, StringComparer.Ordinal);
         portOrder = Document.Snapshot.Ports.Select((p, i) => (p.Id, i)).ToDictionary(p => p.Id, p => p.i, StringComparer.Ordinal);
         labelOrder = Document.Snapshot.Labels.Select((l, i) => (l.Id, i)).ToDictionary(p => p.Id, p => p.i, StringComparer.Ordinal);
@@ -97,6 +98,7 @@ public sealed partial class EditorSession
         var port = HitPort(world, tolerance); if (port is not null) return new(HitKind.Port, port);
         var label = HitLabel(); if (label is not null) return new(HitKind.Label, label);
         var normal = HitNode(world, groupOnly: false); if (normal is not null) return new(HitKind.Node, normal.Id);
+        hitEdges.Sort((a, b) => edgeOrder[b].CompareTo(edgeOrder[a]));
         foreach (var id in hitEdges)
         {
             var points = paths[id];

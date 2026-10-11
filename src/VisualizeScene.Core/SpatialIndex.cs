@@ -1,76 +1,108 @@
 namespace VisualizeScene.Core;
 
-/// <summary>Immutable packed bounding-volume hierarchy. Construct once per graph revision.</summary>
 public readonly record struct SpatialQueryStatistics(int VisitedBranches, int ExaminedEntries, int Results);
 
+/// <summary>Immutable packed bounding-volume hierarchy. Build uses bounded median partitioning, not a full sort at every level.</summary>
 public sealed class SpatialIndex<T>
 {
-    private sealed record Entry(RectD Bounds, T Item);
-    private sealed class Branch
-    {
-        public required RectD Bounds;
-        public Branch? Left, Right;
-        public Entry[]? Entries;
-    }
-    private readonly Branch? root;
+    private readonly record struct Entry(RectD Bounds, T Item);
+    private readonly record struct Branch(RectD Bounds, int Left, int Right, int Start, int Count);
+    private readonly Entry[] entries;
+    private readonly Branch[] branches;
+    private static readonly IComparer<Entry> xComparer = Comparer<Entry>.Create(static (a, b) => a.Bounds.Center.X.CompareTo(b.Bounds.Center.X));
+    private static readonly IComparer<Entry> yComparer = Comparer<Entry>.Create(static (a, b) => a.Bounds.Center.Y.CompareTo(b.Bounds.Center.Y));
     public SpatialIndex(IEnumerable<(RectD Bounds, T Item)> values)
     {
-        var entries = values.Select(v => new Entry(v.Bounds, v.Item)).ToArray();
-        if (entries.Any(e => !e.Bounds.IsValid)) throw new ArgumentException("Invalid index bounds.");
-        root = entries.Length == 0 ? null : Build(entries, 0, entries.Length);
+        ArgumentNullException.ThrowIfNull(values);
+        entries = values.Select(v => new Entry(v.Bounds, v.Item)).ToArray();
+        foreach (var entry in entries)
+            if (!entry.Bounds.IsValid || !double.IsFinite(entry.Bounds.Right) || !double.IsFinite(entry.Bounds.Bottom))
+                throw new ArgumentException("Invalid index bounds.", nameof(values));
+        if (entries.Length == 0) { branches = []; return; }
+        var nodes = new List<Branch>(Math.Max(1, entries.Length / 4));
+        Build(nodes, 0, entries.Length); branches = nodes.ToArray();
     }
-    private static Branch Build(Entry[] entries, int start, int length)
+    private int Build(List<Branch> nodes, int start, int length)
     {
         var bounds = entries[start].Bounds;
         for (var i = start + 1; i < start + length; i++) bounds = RectD.Union(bounds, entries[i].Bounds);
-        var result = new Branch { Bounds = bounds };
-        if (length <= 12) { result.Entries = entries[start..(start + length)]; return result; }
-        var horizontal = bounds.Width >= bounds.Height;
-        Array.Sort(entries, start, length, Comparer<Entry>.Create((a, b) => (horizontal ? a.Bounds.Center.X : a.Bounds.Center.Y).CompareTo(horizontal ? b.Bounds.Center.X : b.Bounds.Center.Y)));
+        if (!bounds.IsValid || !double.IsFinite(bounds.Right) || !double.IsFinite(bounds.Bottom)) throw new ArgumentException("The index extent exceeds the finite coordinate range.");
+        var index = nodes.Count; nodes.Add(default);
+        if (length <= 12) { nodes[index] = new(bounds, -1, -1, start, length); return index; }
         var half = length / 2;
-        result.Left = Build(entries, start, half); result.Right = Build(entries, start + half, length - half);
-        return result;
+        Partition(start, start + length - 1, start + half, bounds.Width >= bounds.Height);
+        var left = Build(nodes, start, half); var right = Build(nodes, start + half, length - half);
+        nodes[index] = new(bounds, left, right, 0, 0); return index;
     }
-    /// <summary>Appends results into caller-owned storage. After warmup this traversal allocates no iterator or stack.</summary>
+    private void Partition(int left, int right, int median, bool horizontal)
+    {
+        static double Coordinate(Entry entry, bool x) => x ? entry.Bounds.Center.X : entry.Bounds.Center.Y;
+        var budget = 2 * (System.Numerics.BitOperations.Log2((uint)(right - left + 1)) + 1);
+        while (left < right)
+        {
+            // An introspective fallback bounds adversarial partitions. Equal-coordinate inputs terminate in one partition.
+            if (budget-- == 0) { Array.Sort(entries, left, right - left + 1, horizontal ? xComparer : yComparer); return; }
+            var a = Coordinate(entries[left], horizontal); var b = Coordinate(entries[(left + right) / 2], horizontal); var c = Coordinate(entries[right], horizontal);
+            var pivot = Math.Max(Math.Min(a, b), Math.Min(Math.Max(a, b), c));
+            var lower = left; var upper = right; var i = left;
+            while (i <= upper)
+            {
+                var value = Coordinate(entries[i], horizontal);
+                if (value < pivot) { (entries[i], entries[lower]) = (entries[lower], entries[i]); i++; lower++; }
+                else if (value > pivot) { (entries[i], entries[upper]) = (entries[upper], entries[i]); upper--; }
+                else i++;
+            }
+            if (median < lower) right = lower - 1;
+            else if (median > upper) left = upper + 1;
+            else return;
+        }
+    }
+    /// <summary>Appends to caller-owned storage. Warm traversal allocates no iterator, stack or per-leaf array.</summary>
     public SpatialQueryStatistics Query(RectD bounds, List<T> destination)
     {
-        ArgumentNullException.ThrowIfNull(destination);
-        Geometry.RectangleContainsRectangle(bounds, bounds);
+        ArgumentNullException.ThrowIfNull(destination); Geometry.RectangleContainsRectangle(bounds, bounds);
         var visited = 0; var examined = 0; var count = 0;
-        Collect(root, bounds, destination, ref visited, ref examined, ref count);
+        if (branches.Length > 0) Collect(0, bounds, destination, ref visited, ref examined, ref count);
         return new(visited, examined, count);
     }
-    private static void Collect(Branch? branch, RectD bounds, List<T> result, ref int visited, ref int examined, ref int count)
+    private void Collect(int node, RectD bounds, List<T> result, ref int visited, ref int examined, ref int count)
     {
-        if (branch is null) return;
-        visited++;
+        ref readonly var branch = ref branches[node]; visited++;
         if (!branch.Bounds.Intersects(bounds)) return;
-        if (branch.Entries is { } entries)
+        if (branch.Count > 0)
         {
-            foreach (var entry in entries)
+            for (var i = branch.Start; i < branch.Start + branch.Count; i++)
             {
-                examined++;
+                examined++; ref readonly var entry = ref entries[i];
                 if (!entry.Bounds.Intersects(bounds)) continue;
                 result.Add(entry.Item); count++;
             }
         }
         else
         {
-            // Match the iterator's established right-before-left traversal order.
             Collect(branch.Right, bounds, result, ref visited, ref examined, ref count);
             Collect(branch.Left, bounds, result, ref visited, ref examined, ref count);
         }
     }
+    /// <summary>Traversal order is spatial, not painter order. Both query overloads use the same right-before-left order.</summary>
     public IEnumerable<T> Query(RectD bounds)
     {
-        if (root is null) yield break;
-        var stack = new Stack<Branch>(); stack.Push(root);
-        while (stack.TryPop(out var branch))
+        Geometry.RectangleContainsRectangle(bounds, bounds); return Enumerate(bounds);
+    }
+    private IEnumerable<T> Enumerate(RectD bounds)
+    {
+        if (branches.Length == 0) yield break;
+        var stack = new Stack<int>(); stack.Push(0);
+        while (stack.TryPop(out var node))
         {
+            var branch = branches[node];
             if (!branch.Bounds.Intersects(bounds)) continue;
-            if (branch.Entries is not null)
-                foreach (var e in branch.Entries) { if (e.Bounds.Intersects(bounds)) yield return e.Item; }
-            else { stack.Push(branch.Left!); stack.Push(branch.Right!); }
+            if (branch.Count > 0)
+            {
+                for (var i = branch.Start; i < branch.Start + branch.Count; i++)
+                    if (entries[i].Bounds.Intersects(bounds)) yield return entries[i].Item;
+            }
+            else { stack.Push(branch.Left); stack.Push(branch.Right); }
         }
     }
 }

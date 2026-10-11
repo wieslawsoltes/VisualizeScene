@@ -14,7 +14,7 @@ public sealed record RenderPreparationStatistics(int SceneBuilds, int NodeIndexB
 public sealed partial class GraphRenderer : IDisposable
 {
     private sealed record NodePicture(GraphNode Style, SKPicture Picture);
-    private sealed record EdgePicture(GraphEdge Edge, IReadOnlyList<PointD> Points, SKPath Path);
+    private sealed record EdgePicture(GraphEdge Edge, IReadOnlyList<PointD> Points, SKPath Path, int Order);
     private GraphSnapshot? graph;
     private GraphIndex? index;
     private SpatialIndex<string> nodeIndex = new([]), edgeIndex = new([]);
@@ -64,16 +64,17 @@ public sealed partial class GraphRenderer : IDisposable
             var routesChanged = previous is null || !previous.Edges.Select(e => e.Id).SequenceEqual(snapshot.Edges.Select(e => e.Id));
             foreach (var id in edges.Keys.Where(id => !index.Edges.ContainsKey(id)).ToArray())
             { edges[id].Path.Dispose(); edges.Remove(id); routesChanged = true; }
-            foreach (var edge in snapshot.Edges)
+            for (var i = 0; i < snapshot.Edges.Length; i++)
             {
+                var edge = snapshot.Edges[i];
                 if (!GraphScene.IsEdgeVisible(index, edge))
                 { if (edges.Remove(edge.Id, out var hidden)) { hidden.Path.Dispose(); routesChanged = true; } continue; }
                 var points = index.EdgePath(edge);
                 if (edges.TryGetValue(edge.Id, out var old) && old.Points.SequenceEqual(points))
-                { edges[edge.Id] = new(edge, points, old.Path); reusedPaths++; continue; }
+                { edges[edge.Id] = new(edge, points, old.Path, i); reusedPaths++; continue; }
                 old?.Path.Dispose(); var path = new SKPath(); path.MoveTo(Point(points[0]));
                 foreach (var point in points.Skip(1)) path.LineTo(Point(point));
-                edges[edge.Id] = new(edge, points, path); createdPaths++; routesChanged = true;
+                edges[edge.Id] = new(edge, points, path, i); createdPaths++; routesChanged = true;
             }
             if (routesChanged || previous is null)
             {
@@ -96,6 +97,7 @@ public sealed partial class GraphRenderer : IDisposable
             var node = index!.Nodes[id];
             if (node.IsGroup && !node.Collapsed) visibleGroups.Add(node); else visibleNodes.Add(node);
         }
+        visibleEdgeIds.Sort((a, b) => edges[a].Order.CompareTo(edges[b].Order));
         visibleNodes.Sort((a, b) => order[a.Id].CompareTo(order[b.Id]));
         visibleGroups.Sort((a, b) => { var c = depths[a.Id].CompareTo(depths[b.Id]); return c != 0 ? c : order[a.Id].CompareTo(order[b.Id]); });
         visibleLabels.Clear(); visiblePorts.Clear();
