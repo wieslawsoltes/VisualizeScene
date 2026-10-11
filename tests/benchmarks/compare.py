@@ -11,8 +11,10 @@ old = {r["name"]: r for r in before["results"]}
 rows = []
 for r in after["results"]:
     b = old[r["name"]]
+    # Zero elapsed time is a censored sample below the timer resolution, not infinite speedup.
+    speedup = b["medianMilliseconds"] / r["medianMilliseconds"] if b["medianMilliseconds"] > 0 and r["medianMilliseconds"] > 0 else None
     rows.append({"name": r["name"], "before": b, "after": r,
-                 "medianSpeedup": b["medianMilliseconds"] / max(r["medianMilliseconds"], 1e-12),
+                 "medianSpeedup": speedup,
                  "allocationReductionPercent": 100 * (1 - r["medianAllocatedBytes"] / b["medianAllocatedBytes"]) if b["medianAllocatedBytes"] else None})
 report = {"baseline": before["revision"], "current": after["revision"], "pixelHashesMatch": before["pixelSha256"] == after["pixelSha256"], "results": rows}
 (root / "comparison.json").write_text(json.dumps(report, indent=2))
@@ -21,8 +23,12 @@ lines = ["# Same-runner performance comparison", "", before["note"], "", f"Basel
          "| Operation | Baseline median ms | Current median ms | Ratio | Bytes/op before → after |", "|---|---:|---:|---:|---:|"]
 for row in rows:
     b, a = row["before"], row["after"]
-    lines.append(f"| {row['name']} | {b['medianMilliseconds']:.6f} | {a['medianMilliseconds']:.6f} | {row['medianSpeedup']:.2f}× | {b['medianAllocatedBytes']:,} → {a['medianAllocatedBytes']:,} |")
+    ratio = f"{row['medianSpeedup']:.2f}×" if row["medianSpeedup"] is not None else "Not resolved"
+    current_time = f"{a['medianMilliseconds']:.6f}" if a["medianMilliseconds"] > 0 else "Below resolution"
+    baseline_time = f"{b['medianMilliseconds']:.6f}" if b["medianMilliseconds"] > 0 else "Below resolution"
+    lines.append(f"| {row['name']} | {baseline_time} | {current_time} | {ratio} | {b['medianAllocatedBytes']:,} → {a['medianAllocatedBytes']:,} |")
 lines += ["", f"Raster fixture pixel hashes match: {report['pixelHashesMatch']}.",
+          "Zero elapsed samples are reported as below timer resolution; no speedup ratio is computed for them.",
           "Timings are descriptive and vary by runner. No timing threshold is substituted for correctness or bounded-work regression assertions."]
 (root / "comparison.md").write_text("\n".join(lines) + "\n")
 print("\n".join(lines))
