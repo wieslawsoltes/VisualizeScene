@@ -30,3 +30,16 @@ CI uses Chromium with the SwiftShader software graphics driver. It records initi
 `features.py` exercises all six layouts, routing undo, eight analysis commands, JSON/GraphML/SVG/PNG downloads, a native-format import round trip and all six samples including the 1,000-node graph. The test disables the optional `showOpenFilePicker` capability before initialization to exercise Uno's standard upload-input fallback. Playwright cannot intercept Chromium's native OS file picker. The file bytes still enter through the real browser file input; no graph mutation API or fake import implementation is used. Native OS picker execution remains unverified.
 
 Reports, read-only model state, console messages and screenshots are written to `artifacts/browser-validation`, `artifacts/browser-editing` and `artifacts/browser-features`. A test count is evidence for this project's contracts only; it is not full yFiles parity validation.
+
+## Placement, snapping and selection
+
+`placement.py` imports its fixture through a real upload input, then checks automatic placement, selected-only behavior, exact undo/redo, magnetic node/corner snapping, cancellation and independent snapping toggles. Screenshots include overlapping and placed labels and active alignment guides.
+
+`selection.py` exercises the Selection menu, item filters, inversion/clear keyboard commands, nonmutating marquee previews, Escape, commit-on-release, modifier combinations, directional window/crossing behavior, port and edge geometry, incoming/outgoing neighbors and out-and-back cancellation. Every scenario asserts the entire graph model and its revision remain unchanged. Neither suite has a graph mutation bridge.
+
+```sh
+python tests/browser/placement.py 'http://127.0.0.1:8080/VisualizeScene/?test=1'
+python tests/browser/selection.py 'http://127.0.0.1:8080/VisualizeScene/?test=1'
+```
+
+Their evidence is uploaded as `browser-placement` and `browser-selection`. A passing source build is not a substitute for these actual input tests.

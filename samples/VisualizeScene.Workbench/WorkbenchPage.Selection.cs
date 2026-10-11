@@ -1,4 +1,7 @@
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Controls;
 using VisualizeScene.Editing;
 
@@ -12,7 +15,7 @@ public sealed partial class WorkbenchPage
         void Item(string text, string id, Action action)
         {
             var item = new MenuFlyoutItem { Text = text }; Register(id, item);
-            item.Click += (_, _) => Run(() => { action(); graph.Focus(FocusState.Programmatic); PublishTestState(); });
+            item.Click += (_, _) => Run(() => { action(); ReturnSelectionFocus(menu, item); PublishTestState(); });
             menu.Items.Add(item);
         }
         Item("Select all  Ctrl+A", "SelectAllItems", graph.Session.SelectAll);
@@ -34,7 +37,7 @@ public sealed partial class WorkbenchPage
             {
                 graph.Session.MarqueeMode = mode;
                 foreach (var pair in modes) pair.Value.IsChecked = pair.Key == mode;
-                graph.Focus(FocusState.Programmatic); PublishTestState();
+                ReturnSelectionFocus(menu, item); PublishTestState();
             };
         }
         menu.Items.Add(new MenuFlyoutSeparator());
@@ -52,8 +55,34 @@ public sealed partial class WorkbenchPage
             {
                 graph.Session.MarqueeItemKinds = kinds;
                 foreach (var pair in filters) pair.Value.IsChecked = pair.Key == kinds;
-                graph.Focus(FocusState.Programmatic); PublishTestState();
+                ReturnSelectionFocus(menu, item); PublishTestState();
             };
         }
     }
+
+    private void ReturnSelectionFocus(MenuBarItem menu, FrameworkElement command)
+    {
+        // Click fires before the flyout closes and restores its old focus. Wait for
+        // the command to unload, then enqueue after that restoration has completed.
+        // Never take focus from another editor, dialog, or newly opened menu.
+        void Restore() => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            if (!graph.IsLoaded || command.IsLoaded || graph.EditingLabelText is not null) return;
+            var focused = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+            static bool Within(DependencyObject? child, DependencyObject ancestor)
+            {
+                for (var current = child; current is not null; current = VisualTreeHelper.GetParent(current))
+                    if (ReferenceEquals(current, ancestor)) return true;
+                return false;
+            }
+            if (focused is null || Within(focused, menu) || Within(focused, command) || Within(focused, graph))
+                graph.Focus(FocusState.Programmatic);
+            PublishTestState();
+        });
+        if (!command.IsLoaded) { Restore(); return; }
+        RoutedEventHandler? unloaded = null;
+        unloaded = (_, _) => { command.Unloaded -= unloaded; Restore(); };
+        command.Unloaded += unloaded;
+    }
+
 }
