@@ -61,7 +61,7 @@ public sealed partial class GraphRenderer : IDisposable
         }
         if (geometryChanged || previous!.Edges != snapshot.Edges)
         {
-            var routesChanged = false;
+            var routesChanged = previous is null || !previous.Edges.Select(e => e.Id).SequenceEqual(snapshot.Edges.Select(e => e.Id));
             foreach (var id in edges.Keys.Where(id => !index.Edges.ContainsKey(id)).ToArray())
             { edges[id].Path.Dispose(); edges.Remove(id); routesChanged = true; }
             foreach (var edge in snapshot.Edges)
@@ -77,7 +77,7 @@ public sealed partial class GraphRenderer : IDisposable
             }
             if (routesChanged || previous is null)
             {
-                edgeIndex = new(edges.Select(e => (RectD.Enclose(e.Value.Points.Select(p => new RectD(p.X, p.Y, 0, 0))).Inflate(14), e.Key)));
+                edgeIndex = new(snapshot.Edges.Where(e => edges.ContainsKey(e.Id)).Select(e => (RectD.Enclose(edges[e.Id].Points.Select(p => new RectD(p.X, p.Y, 0, 0))).Inflate(14), e.Id)));
                 edgeIndexBuilds++;
             }
         }

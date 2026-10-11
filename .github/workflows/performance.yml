@@ -20,9 +20,39 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Navigation contracts
         run: dotnet run --project tests/VisualizeScene.Navigation.Tests -c Release
+      - name: Performance correctness and allocation contracts
+        run: dotnet run --project tests/VisualizeScene.Performance.Tests -c Release
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: navigation-contracts
-          path: artifacts/validation/navigation.xml
+          name: performance-contracts
+          path: artifacts/validation
+          if-no-files-found: error
+  comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_TieredCompilation: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 894cd8e8a0600a73cd4efff9fcac2c5df052a22a
+          path: comparison-baseline
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Run identical benchmark sources against both revisions
+        run: |
+          mkdir -p "$RUNNER_TEMP/benchmark-before" "$RUNNER_TEMP/benchmark-after" artifacts/benchmarks
+          cp tests/benchmarks/Benchmark.csproj tests/benchmarks/Program.cs "$RUNNER_TEMP/benchmark-before/"
+          cp tests/benchmarks/Benchmark.csproj tests/benchmarks/Program.cs "$RUNNER_TEMP/benchmark-after/"
+          dotnet run --project "$RUNNER_TEMP/benchmark-before/Benchmark.csproj" -c Release -p:SourceRoot="$GITHUB_WORKSPACE/comparison-baseline" -- "$GITHUB_WORKSPACE/artifacts/benchmarks/baseline.json" 894cd8e8a0600a73cd4efff9fcac2c5df052a22a
+          dotnet run --project "$RUNNER_TEMP/benchmark-after/Benchmark.csproj" -c Release -p:SourceRoot="$GITHUB_WORKSPACE" -- "$GITHUB_WORKSPACE/artifacts/benchmarks/current.json" "$(git rev-parse HEAD)"
+          python tests/benchmarks/compare.py artifacts/benchmarks
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-comparison
+          path: artifacts/benchmarks
           if-no-files-found: error

@@ -46,7 +46,7 @@ public sealed partial class WorkbenchPage
         var selected = string.Join(",", graph.Session.Selection.Select(String));
         // Reuse the large immutable document payload across camera/selection/animation frames.
         // A changed font measurement provider invalidates label bounds without a graph edit.
-        if (!ReferenceEquals(diagnosticSnapshot, document.Snapshot) || diagnosticMeasure != graph.Session.LabelSizeProvider)
+        if (!ReferenceEquals(diagnosticSnapshot, document.Snapshot) || !ReferenceEquals(diagnosticMeasure, graph.Session.LabelSizeProvider))
         {
             var snapshot = document.Snapshot; var index = snapshot.Index();
             var model = GraphIO.ToJson(snapshot);
