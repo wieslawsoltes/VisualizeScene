@@ -14,7 +14,7 @@ public sealed partial class WorkbenchPage
     private void Register(string id, FrameworkElement element) { AutomationProperties.SetAutomationId(element, id); testControls[id] = element; }
     private Button Button(string label, string id, Action action, string? tooltip = null)
     {
-        var button = new Button { Content = label, FontSize = 12, Padding = new(10, 6, 10, 6), MinHeight = 30 };
+        var button = new Button { Content = label, FontSize = 12, Padding = new(7, 3, 7, 3), MinHeight = 27 };
         Register(id, button); if (tooltip is not null) ToolTipService.SetToolTip(button, tooltip); button.Click += (_, _) => Run(action); return button;
     }
     private MenuBar BuildMenu()
@@ -46,33 +46,14 @@ public sealed partial class WorkbenchPage
         AddSelectionMenu(bar);
         var help = Menu("Help"); Item(help, "Editing guide", () => _ = ShowHelp()); Item(help, "Implementation status", () => _ = ShowStatus()); return bar;
     }
-    private FrameworkElement BuildToolbar()
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, Padding = new(9, 7, 9, 7) };
-        row.Children.Add(Button("New", "New", () => _ = NewGraph())); row.Children.Add(Button("Open", "Open", () => _ = RunAsync(OpenFile))); row.Children.Add(Button("Save", "Save", () => _ = Save("json")));
-        row.Children.Add(Separator()); row.Children.Add(Button("↶", "Undo", document.Undo, "Undo · Ctrl+Z")); row.Children.Add(Button("↷", "Redo", document.Redo, "Redo · Ctrl+Y")); row.Children.Add(Separator());
-        row.Children.Add(Button("Select", "ModeSelect", () => SetMode(EditorMode.Select))); row.Children.Add(Button("Node", "ModeNode", () => SetMode(EditorMode.CreateNode))); row.Children.Add(Button("Edge", "ModeEdge", () => SetMode(EditorMode.CreateEdge))); row.Children.Add(Button("Pan", "ModePan", () => SetMode(EditorMode.Pan)));
-        row.Children.Add(Separator()); row.Children.Add(Button("−", "ZoomOut", () => graph.Zoom(.8))); row.Children.Add(Button("Fit", "Fit", graph.Fit)); row.Children.Add(Button("+", "ZoomIn", () => graph.Zoom(1.25)));
-        row.Children.Add(Separator()); Register("Samples", samples); row.Children.Add(samples);
-        return new ScrollViewer { Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Background = Brush("#ECF0F4") };
-    }
     private static Border Separator() => new() { Width = 1, Height = 25, Margin = new(4, 0, 4, 0), Background = Brush("#C8D0D9"), VerticalAlignment = VerticalAlignment.Center };
     private static TextBlock Heading(string text) => new() { Text = text, FontSize = 12, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new(0, 0, 0, 8) };
-    private Border BuildLeft()
-    {
-        var panel = new Grid { Padding = new(12) }; panel.RowDefinitions.Add(new() { Height = GridLength.Auto }); panel.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) }); panel.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var palette = new NodePalette { Target = graph }; palette.TemplateSelected += (_, template) => { modeText.Text = "Create " + template.Name; status.Text = "Click in the canvas to place a " + template.Name.ToLowerInvariant() + ". Escape returns to selection."; PublishTestState(); };
-        var top = new StackPanel { Spacing = 5 }; top.Children.Add(Heading("NODE PALETTE")); top.Children.Add(palette); top.Children.Add(new TextBlock { Text = "Choose a shape, then click in the diagram.", FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new(0, 8, 0, 10), Foreground = Brush("#5F6E7D") });
-        top.Children.Add(Button("Group selection", "Group", graph.Session.Group)); top.Children.Add(Button("Fold / unfold", "Fold", FoldSelected)); panel.Children.Add(top);
-        var bottom = new StackPanel { Spacing = 5 }; bottom.Children.Add(Heading("OVERVIEW")); overview.Height = 160; bottom.Children.Add(new Border { Child = overview, BorderBrush = Brush("#C5CED7"), BorderThickness = new(1) }); bottom.Children.Add(new TextBlock { Text = "Click the overview to navigate.", FontSize = 10, Foreground = Brush("#647687") }); Grid.SetRow(bottom, 2); panel.Children.Add(bottom);
-        return new Border { Child = panel, Background = Brush("#F4F6F8") };
-    }
     private Border BuildRight()
     {
-        var root = new Grid(); root.RowDefinitions.Add(new() { Height = new(39) }); root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
+        var root = new Grid(); root.RowDefinitions.Add(new() { Height = new(30) }); root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
         var header = new Grid { Padding = new(5, 4, 5, 3), Background = Brush("#ECF0F4") };
         for (var i = 0; i < 3; i++) header.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        var content = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch, Padding = new(11) }; Grid.SetRow(content, 1); root.Children.Add(header); root.Children.Add(content);
+        var content = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch, Padding = new(7) }; Grid.SetRow(content, 1); root.Children.Add(header); root.Children.Add(content);
         var layoutPanel = new StackPanel { Spacing = 12 }; layoutKind.Header = "Layout algorithm"; direction.Header = "Direction"; Register("LayoutKind", layoutKind); layoutPanel.Children.Add(layoutKind); layoutPanel.Children.Add(direction); layoutPanel.Children.Add(spacing); layoutPanel.Children.Add(layers);
         layoutPanel.Children.Add(Button("Apply layout", "ApplyLayout", () => _ = ApplyLayout())); layoutPanel.Children.Add(Button("Route edges", "RouteEdges", () => _ = RouteEdges())); layoutPanel.Children.Add(Button("Cancel operation", "CancelLayout", () => layoutCancellation?.Cancel()));
         layoutPanel.Children.Add(new TextBlock { Text = "Layouts use an immutable snapshot, commit once and can be undone. Stale results are rejected.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = Brush("#657688") });
