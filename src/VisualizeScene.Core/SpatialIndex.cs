@@ -5,7 +5,7 @@ public readonly record struct SpatialQueryStatistics(int VisitedBranches, int Ex
 /// <summary>Immutable packed bounding-volume hierarchy. Build uses bounded median partitioning, not a full sort at every level.</summary>
 public sealed class SpatialIndex<T>
 {
-    private readonly record struct Entry(RectD Bounds, T Item, double CenterX, double CenterY);
+    private sealed record Entry(RectD Bounds, T Item, double CenterX, double CenterY);
     private readonly record struct Branch(RectD Bounds, int Left, int Right, int Start, int Count);
     private readonly Entry[] entries;
     private readonly Branch[] branches;

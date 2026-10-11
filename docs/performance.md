@@ -47,11 +47,13 @@ cached candidate registry once; it is not a logarithmic nearest-neighbor query.
 
 ## Packed spatial hierarchy
 
-SpatialIndex stores entries and branches in packed struct arrays. Leaves reference
+SpatialIndex stores immutable entry records and packed branch struct arrays. Leaves reference
 ranges in shared entry storage instead of owning separate entry arrays. Balanced
 half splits bound tree depth. Three-way median partitioning replaces a full sort at
 every recursive node; an introspective sort fallback bounds pathological partition
-sequences. Equal-coordinate inputs terminate. Invalid and overflowing extents reject.
+sequences. Entry centers are cached; partitions swap references instead of repeatedly
+copying large value entries. Equal-coordinate inputs terminate. Invalid and overflowing
+extents reject.
 
 Query(rectangle, destination) appends into caller-owned storage with no warm iterator,
 stack or leaf-array allocation. Statistics report visited branches, examined leaf
