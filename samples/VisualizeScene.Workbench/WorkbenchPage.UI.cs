@@ -42,6 +42,7 @@ public sealed partial class WorkbenchPage
         var arrange = Menu("Arrange"); Item(arrange, "Group  Ctrl+G", graph.Session.Group); Item(arrange, "Ungroup  Ctrl+Shift+G", graph.Session.Ungroup); Item(arrange, "Fold / unfold selected groups", FoldSelected);
         arrange.Items.Add(new MenuFlyoutSeparator()); foreach (var alignment in Enum.GetValues<Alignment>()) Item(arrange, alignment.ToString(), () => graph.Session.Align(alignment));
         var layout = Menu("Layout"); foreach (var kind in Enum.GetValues<LayoutKind>()) Item(layout, kind.ToString(), () => { layoutKind.SelectedItem = kind; _ = ApplyLayout(); }, "Layout" + kind); Item(layout, "Route edges around obstacles", () => _ = RouteEdges()); Item(layout, "Place independent labels", () => _ = PlaceLabels(), "MenuPlaceLabels");
+        AddSelectionMenu(bar);
         var help = Menu("Help"); Item(help, "Editing guide", () => _ = ShowHelp()); Item(help, "Implementation status", () => _ = ShowStatus()); return bar;
     }
     private FrameworkElement BuildToolbar()

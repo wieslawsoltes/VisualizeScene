@@ -28,7 +28,7 @@ public sealed partial class EditorSession : IDisposable
     public GraphDocument Document { get; }
     public GraphSnapshot DisplayGraph => preview ?? Document.Snapshot;
     public Viewport Viewport { get; } = new();
-    public IReadOnlySet<string> Selection => selection;
+    public IReadOnlySet<string> Selection => readSelection;
     private EditorMode mode;
     public EditorMode Mode
     {
@@ -56,8 +56,8 @@ public sealed partial class EditorSession : IDisposable
     private void DocumentChanged(object? sender, GraphChangedEventArgs args)
     {
         CancelGesture(false); Reindex();
-        var changed = selection.RemoveWhere(id => !index.Nodes.ContainsKey(id) && !index.Edges.ContainsKey(id) && !index.Ports.ContainsKey(id) && !index.Labels.ContainsKey(id)) > 0;
-        if (changed) SelectionChanged?.Invoke(this, EventArgs.Empty);
+        var changed = selection.RemoveWhere(id => !IsSelectable(id)) > 0;
+        if (changed) PublishSelection();
         StatusChanged?.Invoke(this, args.Operation); Invalidate();
     }
     private void Reindex()
@@ -66,16 +66,11 @@ public sealed partial class EditorSession : IDisposable
         nodeIndex = new(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => (n.Bounds, n.Id)));
         paths = Document.Snapshot.Edges.Where(e => GraphScene.IsEdgeVisible(index, e)).ToDictionary(e => e.Id, index.EdgePath);
         edgeIndex = new(paths.Select(p => (RectD.Enclose(p.Value.Select(v => new RectD(v.X, v.Y, 0, 0))).Inflate(1), p.Key)));
-        ReindexLabels(); itemSnaps = new(Document.Snapshot);
+        ReindexLabels(); ReindexSelection(); itemSnaps = new(Document.Snapshot);
     }
     public void Invalidate() => Invalidated?.Invoke(this, EventArgs.Empty);
     public void Select(IEnumerable<string> ids, bool additive = false)
-    {
-        if (!additive) selection.Clear();
-        foreach (var id in ids) if (index.Nodes.ContainsKey(id) || index.Edges.ContainsKey(id) || index.Ports.ContainsKey(id) || index.Labels.ContainsKey(id)) selection.Add(id);
-        SelectionChanged?.Invoke(this, EventArgs.Empty); Invalidate();
-    }
-    public void SelectAll() => Select(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => n.Id).Concat(paths.Keys).Concat(Document.Snapshot.Labels.Where(l => GraphScene.IsOwnerVisible(index, l.OwnerId)).Select(l => l.Id)));
+        => ApplySelection(ids, additive ? SelectionOperation.Add : SelectionOperation.Replace);
     public PointD Snap(PointD point)
     {
         if (!SnapToGrid) return point;
@@ -131,7 +126,7 @@ public sealed partial class EditorSession : IDisposable
     public void PointerDown(PointD screen, InputModifiers keys = InputModifiers.None, bool middleButton = false)
     {
         start = last = screen; modifiers = keys; startRevision = Document.Revision; preview = null;
-        collapseSelectionOnClick = gestureHasMoved = false; drag = null;
+        collapseSelectionOnClick = gestureHasMoved = false; drag = null; ClearMarquee();
         panning = middleButton || Mode == EditorMode.Pan || keys.HasFlag(InputModifiers.Alt);
         if (panning) return;
         var world = Viewport.ToWorld(screen); var hit = Hit(world);
@@ -141,12 +136,14 @@ public sealed partial class EditorSession : IDisposable
         {
             if (keys.HasFlag(InputModifiers.Control) || keys.HasFlag(InputModifiers.Shift))
             {
-                if (!selection.Remove(hit.Id!)) selection.Add(hit.Id!); SelectionChanged?.Invoke(this, EventArgs.Empty); Invalidate();
+                ApplySelection([hit.Id!], PointerSelectionOperation(keys));
+                if (!selection.Contains(hit.Id!)) return;
             }
             else if (!selection.Contains(hit.Id!)) Select([hit.Id!]);
             else collapseSelectionOnClick = selection.Count > 1;
         }
-        else if (hit.Kind == HitKind.None && !keys.HasFlag(InputModifiers.Shift) && !keys.HasFlag(InputModifiers.Control)) Select([]);
+        else if (hit.Kind == HitKind.None) BeginMarquee(keys);
+        if (Document.Revision != startRevision) return;
         drag = hit; BeginItemSnapping(hit);
     }
     public void PointerMove(PointD screen)
@@ -158,11 +155,11 @@ public sealed partial class EditorSession : IDisposable
         if (Document.Revision != startRevision) { CancelGesture(); return; }
         if (PointD.Distance(start, screen) < 2)
         {
-            AlignmentGuides = []; preview = null; Marquee = null; EdgePreview = null; ConnectionCandidate = null; CandidatePosition = null;
+            AlignmentGuides = []; preview = null; marqueePreview = null; Marquee = null; EdgePreview = null; ConnectionCandidate = null; CandidatePosition = null;
             CandidateDecision = ConnectionDecision.Accept; Invalidate(); return;
         }
         gestureHasMoved = true;
-        if (drag.Kind == HitKind.None) { Marquee = RectD.FromPoints(Viewport.ToWorld(start), world); Invalidate(); return; }
+        if (drag.Kind == HitKind.None) { UpdateMarquee(screen); return; }
         if (drag.Kind is HitKind.SourceHandle or HitKind.TargetHandle)
         {
             PreviewConnection(world, index.Edges[drag.Id!], drag.Kind == HitKind.SourceHandle ? EdgeEnd.Source : EdgeEnd.Target); return;
@@ -216,15 +213,19 @@ public sealed partial class EditorSession : IDisposable
             HitKind.ResizeHandle => "Resize node", HitKind.Bend => "Move bend", HitKind.Port => "Move port", HitKind.Label => "Move labels",
             HitKind.SourceHandle => "Reconnect source", HitKind.TargetHandle => "Reconnect target", _ => "Move nodes"
         };
-        var rectangle = Marquee; var additive = modifiers.HasFlag(InputModifiers.Control) || modifiers.HasFlag(InputModifiers.Shift);
+        var rectangle = Marquee; var areaSelection = marqueePreview;
+        var clearOnClick = drag.Kind == HitKind.None && !gestureHasMoved && PointerSelectionOperation(modifiers) == SelectionOperation.Replace;
         AlignmentGuides = []; preview = null; drag = null; Marquee = null; EdgePreview = null; ConnectionCandidate = null; CandidatePosition = null; CandidateDecision = ConnectionDecision.Accept;
         if (next is not null && startRevision == Document.Revision) Document.Replace(next, operation);
         if (clicked is not null) Select([clicked]);
-        if (rectangle.HasValue) Select(nodeIndex.Query(rectangle.Value).Where(id => !index.Nodes[id].IsGroup), additive);
+        ClearMarquee();
+        if (rectangle.HasValue && areaSelection is not null) ApplySelection(areaSelection);
+        else if (clearOnClick) ClearSelection();
         Invalidate();
     }
     public void CancelGesture(bool invalidate = true)
     {
+        ClearMarquee();
         AlignmentGuides = []; preview = null; drag = null; panning = collapseSelectionOnClick = gestureHasMoved = false; Marquee = null; sourceNode = sourcePort = null; EdgePreview = null; ConnectionCandidate = null; CandidatePosition = null; CandidateDecision = ConnectionDecision.Accept;
         if (invalidate) Invalidate();
     }

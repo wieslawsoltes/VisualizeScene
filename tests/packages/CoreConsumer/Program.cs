@@ -33,6 +33,14 @@ Check(placement.EligibleLabels == 1 && placement.Graph.Nodes == document.Snapsho
     "label placement API from the packaged layout library");
 var snap = new ItemSnapIndex(document.Snapshot).Snap(new RectD(0, 0, 10, 10), new(), new HashSet<string>(), 1);
 Check(snap.Correction.IsFinite, "item snapping API from the packaged editing library");
+session.SelectAll(SelectionKinds.Nodes);
+var selectionSnapshot = session.Selection;
+session.Select(session.Selection);
+Check(session.Selection.SetEquals(selectionSnapshot), "selection alias replacement from package");
+session.SelectArea(new RectD(-10000, -10000, 20000, 20000), kinds: SelectionKinds.Labels);
+Check(session.Selection.Contains(labelId), "measured area-selection API from package");
+session.SelectNeighbors(NeighborDirection.Both);
+Check(session.Selection.Contains("a") && session.Selection.Contains("b"), "topology selection API from package");
 var before = document.Snapshot;
 session.MoveLabel(labelId, new(850, 650)); document.Undo();
 Check(GraphIO.ToJson(document.Snapshot) == GraphIO.ToJson(before), "editing package preserves exact undo");

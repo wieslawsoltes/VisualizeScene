@@ -11,8 +11,9 @@ void Test(string name, Action action)
 }
 PlacementTests.Run(Test);
 SnappingTests.Run(Test);
+SelectionTests.Run(Test);
 Directory.CreateDirectory("artifacts/validation");
-File.WriteAllText("artifacts/validation/parity.xml", new XElement("testsuite", new XAttribute("name", "Label placement and snapping"),
+File.WriteAllText("artifacts/validation/parity.xml", new XElement("testsuite", new XAttribute("name", "Placement, snapping and selection"),
     new XAttribute("tests", results.Count), new XAttribute("failures", results.Count(r => r.Error is not null)), results.Select(r =>
         new XElement("testcase", new XAttribute("name", r.Name), new XAttribute("time", r.Time), r.Error is null ? null : new XElement("failure", r.Error)))).ToString());
 Console.WriteLine($"{results.Count(r => r.Error is null)}/{results.Count} passed");
