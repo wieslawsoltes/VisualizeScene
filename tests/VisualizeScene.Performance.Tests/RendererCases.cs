@@ -18,6 +18,7 @@ static class RendererCases
     }
     public static void Run(Action<string, Action> test)
     {
+        SpatialReviewCases.Run(test);
         ReviewCases.Run(test);
         PictureCacheCases.Run(test);
         test("Renderer: 10000 labels/ports use a viewport broad phase", () => {

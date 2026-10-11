@@ -9,6 +9,7 @@ namespace PackageConsumer;
 public sealed class ConsumerView : UserControl, IDisposable
 {
     private readonly GraphControl graph = new();
+    private readonly GraphSearchControl search;
     private readonly GraphOverview overview;
     private readonly GraphPropertyInspector inspector;
     public ConsumerView()
@@ -22,11 +23,13 @@ public sealed class ConsumerView : UserControl, IDisposable
         graph.EnsureFocusedItemVisible();
         graph.Session.ConnectionPolicy = new ConnectionPolicy { AllowParallelEdges = false };
         graph.Session.AddLabel("n", "Annotation");
+        search = new GraphSearchControl { Target = graph };
+        graph.RevealItem("n");
         overview = new GraphOverview { Target = graph };
         inspector = new GraphPropertyInspector { Target = graph };
         var palette = new NodePalette { Target = graph };
         var panel = new StackPanel(); panel.Children.Add(graph); panel.Children.Add(overview);
-        panel.Children.Add(palette); panel.Children.Add(inspector); Content = panel;
+        panel.Children.Add(palette); panel.Children.Add(inspector); panel.Children.Add(search); Content = panel;
     }
-    public new void Dispose() { inspector.Dispose(); overview.Dispose(); graph.Dispose(); }
+    public new void Dispose() { search.Dispose(); inspector.Dispose(); overview.Dispose(); graph.Dispose(); }
 }

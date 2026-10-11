@@ -25,6 +25,8 @@ var results = new List<object>(); object? sink = null;
 void Measure(string name, Action action, int samples = 40, int batch = 1)
 {
     for (var i = 0; i < 10; i++) action();
+    // Isolate retained garbage from preceding workloads; same collection policy for both revisions.
+    GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
     var timings = new double[samples]; var allocations = new long[samples];
     for (var i = 0; i < samples; i++)
     {
@@ -38,6 +40,10 @@ void Measure(string name, Action action, int samples = 40, int batch = 1)
     results.Add(new { name, samples, batch, medianMilliseconds = p50, p95Milliseconds = p95, medianAllocatedBytes = allocations[samples / 2] });
     Console.WriteLine($"{name}: p50 {p50:F6} ms; p95 {p95:F6} ms; {allocations[samples / 2]} bytes/op");
 }
+var spatialItems = nodes.Select(n => (n.Bounds, n.Id)).ToArray();
+Measure("spatial_build_10000", () => sink = new SpatialIndex<string>(spatialItems));
+var spatial = new SpatialIndex<string>(spatialItems); var candidates = new List<string>(64);
+Measure("spatial_query_warm", () => { candidates.Clear(); _ = spatial.Query(new RectD(0, 0, 800, 400), candidates); }, batch: 100);
 Measure("snapshot_index_warm", () => sink = graph.Index(), batch: 5);
 Measure("snapshot_validation_warm", () => GraphValidation.Validate(graph), batch: 5);
 Measure("hit_test_local", () => sink = editor.Hit(new(50, 30), handles: false), batch: 10);
@@ -63,7 +69,7 @@ renderer.Render(surface.Canvas, graph, viewport, 800, 400, options);
 using var image = surface.Snapshot(); using var bitmap = SKBitmap.FromImage(image);
 var report = new { revision = args[1], runtime = RuntimeInformation.FrameworkDescription, os = RuntimeInformation.OSDescription,
     processors = Environment.ProcessorCount, nodes = count, edges = edges.Length, ports = count, labels = count, viewport = new { width = 800, height = 400, zoom = 1 },
-    note = "Same-source, same-runner CPU/raster comparison. Warm operation timings and current-thread managed allocation only; not hardware GPU/FPS/input-latency measurements. Cold render includes construction/disposal with shared model already warmed.",
+    note = "Same-source, same-runner CPU/raster comparison. Full collection after warm-up before each workload in both revisions. Warm operation timings and current-thread managed allocation only; not hardware GPU/FPS/input-latency measurements. Cold render includes construction/disposal with shared model already warmed.",
     pixelSha256 = Convert.ToHexString(SHA256.HashData(bitmap.Bytes)), results };
 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[0]))!);
 File.WriteAllText(args[0], JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));

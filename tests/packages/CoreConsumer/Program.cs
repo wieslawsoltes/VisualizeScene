@@ -77,4 +77,9 @@ var removedGraph = isolatedEdit.Build();
 GraphValidation.Validate(removedGraph);
 Check(removal.Nodes == 2 && removedGraph.Nodes.IsEmpty && removedGraph.Edges.IsEmpty && removedGraph.Labels.IsEmpty,
     "packaged bulk removal cascades dependents");
+var searchResult = new GraphSearchIndex(document.Snapshot).Find("Start", new(MatchCase: true));
+Check(searchResult.Matches.Length == 1 && searchResult.Matches[0].ItemId == "a", "packaged graph text search");
+var searchSnapshot = document.Snapshot;
+Check(searchResult.Replace(document, "Begin", expectedRevision: document.Revision).ChangedItems == 1, "packaged atomic text replacement");
+document.Undo(); Check(ReferenceEquals(searchSnapshot, document.Snapshot), "packaged replacement preserves exact undo");
 Console.WriteLine("Package-only consumer passed; no source project references.");

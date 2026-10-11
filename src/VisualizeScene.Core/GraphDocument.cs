@@ -36,9 +36,10 @@ public sealed class GraphDocument
         if (Equivalent(Snapshot, next)) return;
         Commit(name, next);
     }
-    public void Replace(GraphSnapshot snapshot, string name = "Load graph", bool clearHistory = false)
+    public void Replace(GraphSnapshot snapshot, string name = "Load graph", bool clearHistory = false, long? expectedRevision = null)
     {
         if (editing) throw new InvalidOperationException("Cannot replace inside an edit.");
+        if (expectedRevision.HasValue && Revision != expectedRevision.Value) throw new InvalidOperationException("The graph changed while this replacement was running.");
         GraphValidation.Validate(snapshot);
         if (clearHistory)
         {
