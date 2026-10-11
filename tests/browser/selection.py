@@ -50,6 +50,7 @@ with sync_playwright() as p:
     def command(name):
         click("MenuSelection")
         click(name)
+        wait("v.graphFocused")
 
     def screen(x, y):
         s = state()

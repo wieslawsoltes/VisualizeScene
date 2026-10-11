@@ -82,6 +82,7 @@ with sync_playwright() as p:
             click("Undo")
             wait("v.model.Graph.Labels.every(l => l.Offset.X === 0 && l.Offset.Y === 0)")
             assert state()["model"] == before
+            assert state()["labelPlacement"] is None, "Undo left stale placement diagnostics"
             click("Redo")
             wait("v.model.Graph.Labels.some(l => l.Offset.X !== 0 || l.Offset.Y !== 0)")
             assert state()["model"] == after

@@ -20,6 +20,12 @@ public sealed partial class WorkbenchPage
         Register("SelectedLabelsOnly", selectedLabelsOnly); panel.Children.Add(selectedLabelsOnly);
         panel.Children.Add(Button("Place labels", "PlaceLabels", () => _ = PlaceLabels()));
         panel.Children.Add(labelPlacementOutput);
+        document.Changed += (_, _) =>
+        {
+            if (lastLabelPlacement is null) return;
+            lastLabelPlacement = null;
+            labelPlacementOutput.Text = "Graph changed. Run placement again to recalculate conflicts.";
+        };
     }
 
     private async Task PlaceLabels()

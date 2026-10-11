@@ -81,7 +81,10 @@ public sealed class LabelPlacementEngine
         {
             Tick(); var path = index.EdgePath(edge);
             if (options.AvoidEdges) for (var i = 1; i < path.Count; i++)
+            {
+                Tick(); // Route subdivision consumes work just like obstacle queries.
                 obstacles.Add(new(edge.Id, LabelConflictKind.Edge, RectD.FromPoints(path[i - 1], path[i]).Inflate(options.Gap), path[i - 1], path[i]));
+            }
             if (edge.Text.Length > 0)
             {
                 var caption = new GraphLabel("", edge.Id, edge.Text, new(0, -9), 11);

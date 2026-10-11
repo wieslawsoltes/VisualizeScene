@@ -10,6 +10,7 @@ void Test(string name, Action action)
     results.Add((name, error, timer.Elapsed.TotalSeconds));
 }
 PlacementTests.Run(Test);
+PlacementBudgetTests.Run(Test);
 SnappingTests.Run(Test);
 SelectionTests.Run(Test);
 Directory.CreateDirectory("artifacts/validation");

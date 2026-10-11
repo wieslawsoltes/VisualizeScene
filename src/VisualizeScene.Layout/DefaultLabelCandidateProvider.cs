@@ -7,6 +7,14 @@ public sealed class DefaultLabelCandidateProvider : ILabelCandidateProvider
 {
     public IEnumerable<PointD> GetCandidates(LabelCandidateContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        // The built-in provider adapts to the configured bound. User-supplied
+        // providers are still checked by the engine and diagnosed if they exceed it.
+        return Generate(context).Take(context.Options.CandidateLimit);
+    }
+
+    private static IEnumerable<PointD> Generate(LabelCandidateContext context)
+    {
         var index = context.Index; var label = context.Label; var size = context.Size; var gap = context.Options.Gap;
         if (index.Nodes.TryGetValue(label.OwnerId, out var node))
         {
