@@ -46,26 +46,3 @@ public static partial class Geometry
 
 
 }
-
-public sealed class Viewport
-{
-    public PointD Origin { get; private set; }
-    public double Zoom { get; private set; } = 1;
-    public PointD ToWorld(PointD screen) => Origin + screen * (1 / Zoom);
-    public PointD ToScreen(PointD world) => (world - Origin) * Zoom;
-    public void Pan(PointD screenDelta) => Origin -= screenDelta * (1 / Zoom);
-    public void Center(PointD point, double width, double height) => Origin = point - new PointD(width / (2 * Zoom), height / (2 * Zoom));
-    public void ZoomAt(PointD screenAnchor, double factor)
-    {
-        if (!double.IsFinite(factor) || factor <= 0) throw new ArgumentOutOfRangeException(nameof(factor));
-        var anchor = ToWorld(screenAnchor);
-        Zoom = Math.Clamp(Zoom * factor, .05, 8);
-        Origin = anchor - screenAnchor * (1 / Zoom);
-    }
-    public void Fit(RectD bounds, double width, double height, double padding = 40)
-    {
-        if (width <= 2 * padding || height <= 2 * padding) return;
-        Zoom = Math.Clamp(Math.Min((width - 2 * padding) / Math.Max(1, bounds.Width), (height - 2 * padding) / Math.Max(1, bounds.Height)), .05, 2);
-        Center(bounds.Center, width, height);
-    }
-}
