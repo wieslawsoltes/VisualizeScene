@@ -35,10 +35,10 @@ public sealed partial class GraphRenderer
         {
             using var shape = Shape(node); Use(SKColor.Parse(node.Fill)); canvas.DrawPath(shape, paint); Use(SKColor.Parse(node.Stroke), SKPaintStyle.Stroke, 1.5f); canvas.DrawPath(shape, paint); return;
         }
-        var style = node with { Bounds = new(0, 0, node.Bounds.Width, node.Bounds.Height), ParentId = null, Locked = false };
-        if (!pictures.TryGetValue(node.Id, out var cached) || cached.Style != style)
+        if (!pictures.TryGetValue(node.Id, out var cached) || !SameNodePictureStyle(node, cached.Style))
         {
-            cached?.Picture.Dispose(); using var recorder = new SKPictureRecorder();
+            var style = node with { Bounds = new(0, 0, node.Bounds.Width, node.Bounds.Height), ParentId = null, Locked = false };
+            using var recorder = new SKPictureRecorder();
             var target = recorder.BeginRecording(new SKRect(-3, -3, (float)node.Bounds.Width + 3, (float)node.Bounds.Height + 3));
             using var shape = Shape(style); Use(SKColor.Parse(style.Fill)); target.DrawPath(shape, paint); Use(SKColor.Parse(style.Stroke), SKPaintStyle.Stroke, 1.4f); target.DrawPath(shape, paint);
             if (style.IsGroup && !style.Collapsed)
@@ -50,9 +50,13 @@ public sealed partial class GraphRenderer
             {
                 Use(SKColor.Parse(style.Stroke), SKPaintStyle.Stroke, 1.2f); target.DrawRect(new SKRect(8, 8, 20, 20), paint); target.DrawLine(11, 14, 17, 14, paint); if (style.Collapsed) target.DrawLine(14, 11, 14, 17, paint);
             }
-            pictures[node.Id] = cached = new(style, recorder.EndRecording());
+            var next = new NodePicture(style, recorder.EndRecording()); cached?.Picture.Dispose(); cached = next; nodeRecordings++;
+            if (pictureCacheCapacity > 0) pictures[node.Id] = cached;
         }
-        var save = canvas.Save(); canvas.Translate((float)node.Bounds.X, (float)node.Bounds.Y); canvas.DrawPicture(cached.Picture); canvas.RestoreToCount(save);
+        if (pictureCacheCapacity > 0) TouchPicture(true, node.Id);
+        var save = canvas.Save();
+        try { canvas.Translate((float)node.Bounds.X, (float)node.Bounds.Y); canvas.DrawPicture(cached.Picture); }
+        finally { canvas.RestoreToCount(save); if (pictureCacheCapacity == 0) cached.Picture.Dispose(); }
     }
     private void DrawEdge(SKCanvas canvas, EdgePicture edge, double zoom, RenderOptions options)
     {
@@ -74,13 +78,20 @@ public sealed partial class GraphRenderer
     }
     private void DrawLabels(SKCanvas canvas, GraphSnapshot snapshot, RectD view)
     {
-        foreach (var label in snapshot.Labels)
+        visibleLabels.Clear(); var query = labelIndex.Query(view, visibleLabels); examinedItems += query.ExaminedEntries;
+        visibleLabels.Sort((a, b) => a.Order.CompareTo(b.Order));
+        foreach (var visual in visibleLabels)
         {
-            if (!GraphScene.IsOwnerVisible(index!, label.OwnerId)) continue;
-            var center = GraphScene.LabelAnchor(index!, label.OwnerId) + label.Offset;
-            var bounds = GraphScene.LabelBounds(index!, label, MeasureLabel(label));
-            if (view.Intersects(bounds)) DrawText(canvas, label.Text, center, label.FontSize, background: true);
+            DrawLabelPicture(canvas, visual); frameLabels++;
         }
+    }
+    // Selection membership is O(1); only viewport candidates are visited, even after Select All.
+    private IEnumerable<string> VisibleSelection(IReadOnlySet<string> selection)
+    {
+        foreach (var id in visibleNodeIds) if (selection.Contains(id)) yield return id;
+        foreach (var id in visibleEdgeIds) if (selection.Contains(id)) yield return id;
+        foreach (var visual in visibleLabels) if (selection.Contains(visual.Label.Id)) yield return visual.Label.Id;
+        foreach (var visual in visiblePorts) if (selection.Contains(visual.Id)) yield return visual.Id;
     }
     private void DrawSelection(SKCanvas canvas, double zoom, RenderOptions options)
     {
@@ -89,8 +100,9 @@ public sealed partial class GraphRenderer
         {
             var rect = new SKRect((float)center.X - handle, (float)center.Y - handle, (float)center.X + handle, (float)center.Y + handle); Use(SKColors.White); canvas.DrawRect(rect, paint); Use(accent, SKPaintStyle.Stroke, (float)(1.3 / zoom)); canvas.DrawRect(rect, paint);
         }
-        if (options.Selection is not null) foreach (var id in options.Selection)
+        if (options.Selection is not null) foreach (var id in VisibleSelection(options.Selection))
         {
+            frameAdorners++;
             if (index!.Nodes.TryGetValue(id, out var node) && index.IsVisible(id))
             {
                 var b = node.Bounds; Use(accent, SKPaintStyle.Stroke, (float)(1.6 / zoom)); canvas.DrawRect(Rect(b.Inflate(2 / zoom)), paint); if (!node.Locked) { Handle(new(b.X, b.Y)); Handle(new(b.Right, b.Y)); Handle(new(b.Right, b.Bottom)); Handle(new(b.X, b.Bottom)); }

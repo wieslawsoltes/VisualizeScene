@@ -20,7 +20,7 @@ public sealed partial class GraphControl : ContentControl, IDisposable
         {
             if (owner.disposed) return;
             var s = owner.Session;
-            owner.renderer.Render(canvas, s.DisplayGraph, s.Viewport, area.Width, area.Height, new(s.ShowGrid, s.GridSize, s.DisplaySelection, s.Marquee, s.EdgePreview, CandidatePosition: s.CandidatePosition, IsValidConnection: s.CandidateDecision.Allowed, AlignmentGuides: s.AlignmentGuides, MarqueeContains: s.IsMarqueeContainment));
+            owner.renderer.Render(canvas, s.DisplayGraph, s.Viewport, area.Width, area.Height, new(s.ShowGrid, s.GridSize, s.DisplaySelection, s.Marquee, s.EdgePreview, CandidatePosition: s.CandidatePosition, IsValidConnection: s.CandidateDecision.Allowed, AlignmentGuides: s.AlignmentGuides, MarqueeContains: s.IsMarqueeContainment, FocusBounds: owner.showKeyboardFocus && owner.FocusState != FocusState.Unfocused ? s.FocusedItemBounds : null));
             owner.FrameRendered?.Invoke(owner, EventArgs.Empty);
         }
     }
@@ -30,6 +30,7 @@ public sealed partial class GraphControl : ContentControl, IDisposable
     private GraphDocument document = new();
     public EditorSession Session { get; private set; }
     public RenderStatistics RenderStatistics => renderer.Statistics;
+    public RenderPreparationStatistics PreparationStatistics => renderer.PreparationStatistics;
     public event EventHandler? SelectionChanged;
     public event EventHandler? FrameRendered;
     public event EventHandler<string>? Error;
@@ -40,24 +41,28 @@ public sealed partial class GraphControl : ContentControl, IDisposable
         set
         {
             ArgumentNullException.ThrowIfNull(value); if (ReferenceEquals(document, value)) return;
-            var previous = document; clicks.Reset(); Session.Dispose(); document = value; Session = new(value); Attach();
+            var previous = document; CancelTouchNavigation(); Session.Dispose(); document = value; Session = new(value); Attach();
             DocumentChanged?.Invoke(this, new(previous, value)); Invalidate();
         }
     }
     public GraphControl()
     {
         DefaultStyleKey = typeof(ContentControl); IsTabStop = true;
+        ManipulationMode = Microsoft.UI.Xaml.Input.ManipulationModes.None;
         HorizontalContentAlignment = HorizontalAlignment.Stretch; VerticalContentAlignment = VerticalAlignment.Stretch; Background = new SolidColorBrush(Microsoft.UI.Colors.White);
         AutomationProperties.SetName(this, "Graph editor"); AutomationProperties.SetAutomationId(this, "GraphEditor");
         Session = new(document); surface = new Surface(this) { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch }; Content = surface; Attach();
-        PointerPressed += Pressed; PointerMoved += Moved; PointerReleased += Released; PointerCanceled += (_, _) => { clicks.Reset(); Session.CancelGesture(); };
-        PointerCaptureLost += (_, _) => { if (!releasingCapture && Session.Mode != EditorMode.CreateEdge) { clicks.Reset(); Session.CancelGesture(); } };
+        PointerPressed += Pressed; PointerMoved += Moved; PointerReleased += Released; PointerCanceled += Canceled;
+        PointerCaptureLost += CaptureLost;
+        LostFocus += (_, _) => { showKeyboardFocus = false; CancelTouchNavigation(); };
+        Unloaded += (_, _) => CancelTouchNavigation();
         PointerWheelChanged += Wheel; // Native double-tap can span different editor modes; recognition happens on completed clicks.
         DoubleTapped += (_, args) => args.Handled = true; KeyDown += Key; SizeChanged += (_, _) => Invalidate();
         RightTapped += (_, args) => { ContextMenu().ShowAt(this, args.GetPosition(this)); args.Handled = true; };
     }
     private void Attach()
     {
+        AttachNavigation();
         Session.LabelSizeProvider = label => renderer.MeasureLabel(label);
         Session.Invalidated += (_, _) => Invalidate(); Session.SelectionChanged += (_, _) => SelectionChanged?.Invoke(this, EventArgs.Empty); Session.StatusChanged += (_, text) => StatusChanged?.Invoke(this, text);
     }
@@ -65,14 +70,16 @@ public sealed partial class GraphControl : ContentControl, IDisposable
     private void Run(Action action) { try { action(); } catch (Exception ex) { Error?.Invoke(this, ex.Message); } }
     public void Fit()
     {
-        Session.Viewport.Fit(ContentBounds, ActualWidth, ActualHeight); Invalidate();
+        CancelTouchNavigation(); Session.Viewport.Fit(ContentBounds, ActualWidth, ActualHeight); Invalidate();
     }
-    public void Zoom(double factor) { Session.Viewport.ZoomAt(new(ActualWidth / 2, ActualHeight / 2), factor); Invalidate(); }
-    public void SetMode(EditorMode mode) { clicks.Reset(); Session.CancelGesture(); Session.Mode = mode; Focus(FocusState.Programmatic); Invalidate(); }
+    public void Zoom(double factor) { CancelTouchNavigation(); Session.Viewport.ZoomAt(new(ActualWidth / 2, ActualHeight / 2), factor); Invalidate(); }
+    public void SetMode(EditorMode mode) { CancelTouchNavigation(); Session.Mode = mode; Focus(FocusState.Programmatic); Invalidate(); }
     public string AddNodeAtCenter() => Session.AddNode(Session.Viewport.ToWorld(new(ActualWidth / 2, ActualHeight / 2)));
     public byte[] ExportPng(double scale = 1) => renderer.ExportPng(Document.Snapshot, scale);
     public new void Dispose()
     {
-        if (disposed) return; disposed = true; Session.Dispose(); renderer.Dispose(); customTypeface?.Dispose(); customTypeface = null;
+        if (disposed) return; CancelTouchNavigation(); disposed = true;
+        if (inputDocument is not null) inputDocument.Changed -= InputDocumentChanged;
+        Session.Dispose(); renderer.Dispose(); customTypeface?.Dispose(); customTypeface = null;
     }
 }

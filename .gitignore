@@ -7,3 +7,5 @@ node_modules/
 TestResults/
 *.user
 **/__pycache__/
+
+comparison-baseline/

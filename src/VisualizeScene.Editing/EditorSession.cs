@@ -55,7 +55,7 @@ public sealed partial class EditorSession : IDisposable
     public void Dispose() => Document.Changed -= DocumentChanged;
     private void DocumentChanged(object? sender, GraphChangedEventArgs args)
     {
-        CancelGesture(false); Reindex();
+        CancelGesture(false); Reindex(); RefreshNavigation();
         var changed = selection.RemoveWhere(id => !IsSelectable(id)) > 0;
         if (changed) PublishSelection();
         StatusChanged?.Invoke(this, args.Operation); Invalidate();
@@ -66,7 +66,7 @@ public sealed partial class EditorSession : IDisposable
         nodeIndex = new(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => (n.Bounds, n.Id)));
         paths = Document.Snapshot.Edges.Where(e => GraphScene.IsEdgeVisible(index, e)).ToDictionary(e => e.Id, index.EdgePath);
         edgeIndex = new(paths.Select(p => (RectD.Enclose(p.Value.Select(v => new RectD(v.X, v.Y, 0, 0))).Inflate(1), p.Key)));
-        ReindexLabels(); ReindexSelection(); itemSnaps = new(Document.Snapshot);
+        ReindexLabels(); ReindexSelection(); ReindexHitOrder(); itemSnaps = new(Document.Snapshot);
     }
     public void Invalidate() => Invalidated?.Invoke(this, EventArgs.Empty);
     public void Select(IEnumerable<string> ids, bool additive = false)
@@ -76,46 +76,6 @@ public sealed partial class EditorSession : IDisposable
         if (!SnapToGrid) return point;
         if (!double.IsFinite(GridSize) || GridSize <= 0) throw new InvalidOperationException("Grid size must be finite and positive.");
         return new(Math.Round(point.X / GridSize) * GridSize, Math.Round(point.Y / GridSize) * GridSize);
-    }
-    public HitResult Hit(PointD world, bool handles = true)
-    {
-        var tolerance = 7 / Viewport.Zoom;
-        if (handles)
-        {
-            foreach (var id in selection)
-            {
-                if (index.Nodes.TryGetValue(id, out var node) && !node.Locked && index.IsVisible(id))
-                {
-                    var b = node.Bounds; PointD[] points = [new(b.X, b.Y), new(b.Right, b.Y), new(b.Right, b.Bottom), new(b.X, b.Bottom)];
-                    for (var i = 0; i < points.Length; i++) if (PointD.Distance(world, points[i]) <= tolerance) return new(HitKind.ResizeHandle, id, i);
-                }
-                if (index.Edges.TryGetValue(id, out var edge) && paths.TryGetValue(id, out var path))
-                {
-                    if (index.IsVisible(edge.SourceId) && !index.Nodes[edge.SourceId].Locked && PointD.Distance(world, path[0]) <= tolerance) return new(HitKind.SourceHandle, id);
-                    if (index.IsVisible(edge.TargetId) && !index.Nodes[edge.TargetId].Locked && PointD.Distance(world, path[^1]) <= tolerance) return new(HitKind.TargetHandle, id);
-                    if (!edge.Bends.IsDefault)
-                        for (var i = 0; i < edge.Bends.Length; i++) if (PointD.Distance(world, edge.Bends[i]) <= tolerance) return new(HitKind.Bend, id, i);
-                }
-            }
-        }
-        foreach (var p in Document.Snapshot.Ports) if (index.IsVisible(p.NodeId) && PointD.Distance(world, index.PortLocation(p.Id)) < tolerance) return new(HitKind.Port, p.Id);
-        if (Viewport.Zoom >= .25)
-        {
-            var labels = labelIndex.Query(new RectD(world.X, world.Y, 0, 0)).ToHashSet();
-            var label = Document.Snapshot.Labels.LastOrDefault(l => labels.Contains(l.Id));
-            if (label is not null) return new(HitKind.Label, label.Id);
-        }
-        var candidates = nodeIndex.Query(new(world.X, world.Y, 0, 0)).ToHashSet();
-        var hitNodes = Document.Snapshot.Nodes.Where(n => candidates.Contains(n.Id) && Geometry.HitNode(n, world)).Reverse().ToArray();
-        var normal = hitNodes.FirstOrDefault(n => !n.IsGroup || n.Collapsed);
-        if (normal is not null) return new(HitKind.Node, normal.Id);
-        foreach (var id in edgeIndex.Query(new RectD(world.X, world.Y, 0, 0).Inflate(tolerance)))
-        {
-            var points = paths[id];
-            for (var i = 1; i < points.Count; i++) if (Geometry.DistanceToSegment(world, points[i - 1], points[i]) <= tolerance) return new(HitKind.Edge, id);
-        }
-        var group = hitNodes.FirstOrDefault(n => world.Y < n.Bounds.Y + 25 || world.X < n.Bounds.X + 6 || world.X > n.Bounds.Right - 6 || world.Y > n.Bounds.Bottom - 6);
-        return group is null ? new(HitKind.None) : new(HitKind.Node, group.Id);
     }
     public string AddNode(PointD center)
     {
@@ -189,8 +149,8 @@ public sealed partial class EditorSession : IDisposable
         else if (drag.Kind == HitKind.ResizeHandle)
         {
             var n = index.Nodes[drag.Id!]; var p = SnapResizePoint(world); var b = n.Bounds;
-            var opposite = drag.Part switch { 0 => new PointD(b.Right, b.Bottom), 1 => new(b.X, b.Bottom), 2 => new(b.X, b.Y), _ => new(b.Right, b.Y) };
-            var rect = RectD.FromPoints(opposite, p); if (rect.Width < 20 || rect.Height < 20) AlignmentGuides = []; rect = rect with { Width = Math.Max(20, rect.Width), Height = Math.Max(20, rect.Height) };
+            var rect = ResizeBounds(b, p, drag.Part);
+            if (rect.Width == 20 || rect.Height == 20) AlignmentGuides = [];
             edit.Update(n with { Bounds = rect });
         }
         else if (drag.Kind == HitKind.Bend)
@@ -231,7 +191,7 @@ public sealed partial class EditorSession : IDisposable
     }
     public void DeleteSelection()
     {
-        var ids = selection.ToArray(); Document.Edit("Delete selection", edit => { foreach (var id in ids) edit.Remove(id); }); Select([]);
+        var ids = selection.ToArray(); Document.Edit("Delete selection", edit => edit.RemoveRange(ids)); Select([]);
     }
     public GraphSnapshot Copy()
     {
@@ -275,26 +235,5 @@ public sealed partial class EditorSession : IDisposable
         var edge = index.Edges[edgeId]; var path = paths[edgeId]; var nearest = Enumerable.Range(1, path.Count - 1).MinBy(i => Geometry.DistanceToSegment(world, path[i - 1], path[i]));
         var bends = path.Skip(1).Take(path.Count - 2).ToList(); bends.Insert(nearest - 1, Snap(world));
         Document.Edit("Insert bend", edit => edit.Update(edge with { Bends = bends.ToImmutableArray() })); Select([edgeId]);
-    }
-    public void Align(Alignment alignment)
-    {
-        var nodes = selection.Where(index.Nodes.ContainsKey).Select(id => index.Nodes[id]).Where(n => !n.Locked).ToArray(); if (nodes.Length < 2) return;
-        var bounds = RectD.Enclose(nodes.Select(n => n.Bounds)); var ordered = nodes.OrderBy(n => alignment == Alignment.DistributeVertical ? n.Bounds.Y : n.Bounds.X).ToArray();
-        var gap = alignment == Alignment.DistributeVertical ? (bounds.Height - nodes.Sum(n => n.Bounds.Height)) / (nodes.Length - 1) : (bounds.Width - nodes.Sum(n => n.Bounds.Width)) / (nodes.Length - 1);
-        var cursor = alignment == Alignment.DistributeVertical ? bounds.Y : bounds.X;
-        Document.Edit("Align nodes", edit =>
-        {
-            foreach (var node in ordered)
-            {
-                var b = node.Bounds;
-                var target = alignment switch
-                {
-                    Alignment.Left => b with { X = bounds.X }, Alignment.HorizontalCenter => b with { X = bounds.Center.X - b.Width / 2 }, Alignment.Right => b with { X = bounds.Right - b.Width },
-                    Alignment.Top => b with { Y = bounds.Y }, Alignment.VerticalCenter => b with { Y = bounds.Center.Y - b.Height / 2 }, Alignment.Bottom => b with { Y = bounds.Bottom - b.Height },
-                    Alignment.DistributeHorizontal => b with { X = cursor }, Alignment.DistributeVertical => b with { Y = cursor }, _ => b
-                };
-                edit.Move([node.Id], new(target.X - b.X, target.Y - b.Y)); cursor += (alignment == Alignment.DistributeVertical ? b.Height : b.Width) + gap;
-            }
-        });
     }
 }

@@ -29,6 +29,9 @@ public sealed partial class GraphControl
     private PointD Position(PointerRoutedEventArgs args) { var p = args.GetCurrentPoint(this).Position; return new(p.X, p.Y); }
     private void Pressed(object sender, PointerRoutedEventArgs args)
     {
+        if (IsTouch(args)) { RunTouch(() => TouchPressed(args)); return; }
+        if (touchNavigator.ContactCount > 0) { args.Handled = true; return; }
+        showKeyboardFocus = false;
         var point = args.GetCurrentPoint(this);
         if (editingLabel || point.Properties.IsRightButtonPressed) { clicks.Reset(); return; }
         Focus(FocusState.Pointer);
@@ -41,11 +44,20 @@ public sealed partial class GraphControl
     }
     private void Moved(object sender, PointerRoutedEventArgs args)
     {
+        if (IsTouch(args)) { RunTouch(() => TouchMoved(args)); return; }
+        if (touchNavigator.ContactCount > 0) return;
         clicks.Move(Position(args));
         if (!editingLabel) Run(() => Session.PointerMove(Position(args)));
     }
     private async void Released(object sender, PointerRoutedEventArgs args)
     {
+        if (IsTouch(args))
+        {
+            try { await TouchReleased(args); }
+            catch (Exception ex) { CancelTouchNavigation(); Error?.Invoke(this, ex.Message); }
+            return;
+        }
+        if (touchNavigator.ContactCount > 0) { args.Handled = true; return; }
         var screen = Position(args);
         Run(() => Session.PointerUp(screen));
         var doubleClick = clicks.Release(screen, Document.Revision, ClickTime);
@@ -57,7 +69,8 @@ public sealed partial class GraphControl
     }
     private void Wheel(object sender, PointerRoutedEventArgs args)
     {
-        clicks.Reset();
+        if (editingLabel) return;
+        CancelTouchNavigation();
         var delta = args.GetCurrentPoint(this).Properties.MouseWheelDelta; Session.Viewport.ZoomAt(Position(args), Math.Pow(1.15, delta / 120d)); Invalidate(); args.Handled = true;
     }
     private async Task ActivateDoubleClickAsync(HitResult hit, PointD world)
@@ -85,7 +98,7 @@ public sealed partial class GraphControl
             IsLabelEditorReady = input.Focus(FocusState.Programmatic);
             if (unchanged) input.SelectAll();
         };
-        clicks.Reset(); Session.CancelGesture(); editingLabel = true; labelInput = input; IsLabelEditorReady = false;
+        CancelTouchNavigation(); editingLabel = true; labelInput = input; IsLabelEditorReady = false;
         try
         {
             if (await dialog.ShowAsync() == ContentDialogResult.Primary)
@@ -106,6 +119,9 @@ public sealed partial class GraphControl
     {
         clicks.Reset();
         if (editingLabel) return;
+        try { if (NavigationKey(args)) { args.Handled = true; return; } }
+        catch (Exception ex) { Error?.Invoke(this, ex.Message); args.Handled = true; return; }
+        if (touchNavigator.ContactCount > 0) CancelTouchNavigation();
         var modifiers = Modifiers(); var control = modifiers.HasFlag(InputModifiers.Control); var shift = modifiers.HasFlag(InputModifiers.Shift); var handled = true;
         try
         {

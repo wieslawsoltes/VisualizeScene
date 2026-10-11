@@ -18,7 +18,7 @@ public sealed partial class GraphControl
         using var data = SKData.CreateCopy(memory.ToArray()); var face = SKTypeface.FromData(data) ?? throw new InvalidDataException("The application font could not be decoded.");
         if (disposed || request != fontRequest) { face.Dispose(); return; }
         GraphRenderer next;
-        try { next = new GraphRenderer(face); } catch { face.Dispose(); throw; }
+        try { next = new GraphRenderer(face) { PictureCacheCapacity = renderer.PictureCacheCapacity }; } catch { face.Dispose(); throw; }
         renderer.Dispose(); customTypeface?.Dispose(); customTypeface = face; renderer = next; boundsSnapshot = null;
         Session.LabelSizeProvider = label => renderer.MeasureLabel(label); Invalidate();
     }

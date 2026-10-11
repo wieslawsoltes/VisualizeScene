@@ -18,8 +18,12 @@ public sealed partial class EditorSession
 
     public RectD GetLabelBounds(GraphLabel label) => GraphScene.LabelBounds(index, label, labelSizeProvider(label));
 
-    private void ReindexLabels() => labelIndex = new(Document.Snapshot.Labels
-        .Where(l => GraphScene.IsOwnerVisible(index, l.OwnerId)).Select(l => (GetLabelBounds(l), l.Id)));
+    private void ReindexLabels()
+    {
+        navigationIndex = null;
+        labelIndex = new(Document.Snapshot.Labels.Where(l => GraphScene.IsOwnerVisible(index, l.OwnerId))
+            .Select(l => (GetLabelBounds(l), l.Id)));
+    }
 
     private bool CanMoveOwner(string ownerId)
     {
@@ -48,17 +52,21 @@ public sealed partial class EditorSession
     private void MoveSelection(GraphEdit edit, PointD delta)
     {
         if (!delta.IsFinite) throw new ArgumentException("Movement must be finite.", nameof(delta));
-        edit.Move(selection, delta);
-        var next = edit.Build().Index();
-        foreach (var port in selection.Where(index.Ports.ContainsKey).Select(id => index.Ports[id]))
+        var moveNodes = selection.Any(index.Nodes.ContainsKey);
+        if (moveNodes) edit.Move(selection, delta);
+        var selectedPorts = selection.Where(index.Ports.ContainsKey).Select(id => index.Ports[id]).Where(CanMovePort).ToArray();
+        foreach (var port in selectedPorts)
         {
-            if (!CanMovePort(port)) continue;
             // A selected port keeps the same world-space movement as its selected owner, without doubling it.
             var desired = index.PortLocation(port.Id) + delta;
-            edit.Update(port with { RelativeLocation = RelativePortLocation(next.Nodes[port.NodeId], desired) });
+            var owner = moveNodes ? edit.Node(port.NodeId) : index.Nodes[port.NodeId];
+            edit.Update(port with { RelativeLocation = RelativePortLocation(owner, desired) });
         }
-        next = edit.Build().Index();
-        foreach (var label in selection.Where(index.Labels.ContainsKey).Select(id => index.Labels[id]))
+        var selectedLabels = selection.Where(index.Labels.ContainsKey).Select(id => index.Labels[id]).ToArray();
+        if (selectedLabels.Length == 0) return;
+        // Most drags move only nodes. Label-only drags need no intermediate graph/index either.
+        var next = moveNodes || selectedPorts.Length != 0 ? edit.Build().Index() : index;
+        foreach (var label in selectedLabels)
         {
             if (!CanMoveOwner(label.OwnerId)) continue;
             var oldAnchor = GraphScene.LabelAnchor(index, label.OwnerId);

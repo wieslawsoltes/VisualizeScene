@@ -1,6 +1,8 @@
 namespace VisualizeScene.Core;
 
 /// <summary>Immutable packed bounding-volume hierarchy. Construct once per graph revision.</summary>
+public readonly record struct SpatialQueryStatistics(int VisitedBranches, int ExaminedEntries, int Results);
+
 public sealed class SpatialIndex<T>
 {
     private sealed record Entry(RectD Bounds, T Item);
@@ -28,6 +30,36 @@ public sealed class SpatialIndex<T>
         var half = length / 2;
         result.Left = Build(entries, start, half); result.Right = Build(entries, start + half, length - half);
         return result;
+    }
+    /// <summary>Appends results into caller-owned storage. After warmup this traversal allocates no iterator or stack.</summary>
+    public SpatialQueryStatistics Query(RectD bounds, List<T> destination)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        Geometry.RectangleContainsRectangle(bounds, bounds);
+        var visited = 0; var examined = 0; var count = 0;
+        Collect(root, bounds, destination, ref visited, ref examined, ref count);
+        return new(visited, examined, count);
+    }
+    private static void Collect(Branch? branch, RectD bounds, List<T> result, ref int visited, ref int examined, ref int count)
+    {
+        if (branch is null) return;
+        visited++;
+        if (!branch.Bounds.Intersects(bounds)) return;
+        if (branch.Entries is { } entries)
+        {
+            foreach (var entry in entries)
+            {
+                examined++;
+                if (!entry.Bounds.Intersects(bounds)) continue;
+                result.Add(entry.Item); count++;
+            }
+        }
+        else
+        {
+            // Match the iterator's established right-before-left traversal order.
+            Collect(branch.Right, bounds, result, ref visited, ref examined, ref count);
+            Collect(branch.Left, bounds, result, ref visited, ref examined, ref count);
+        }
     }
     public IEnumerable<T> Query(RectD bounds)
     {
