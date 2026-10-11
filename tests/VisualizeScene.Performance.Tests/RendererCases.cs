@@ -19,6 +19,7 @@ static class RendererCases
     public static void Run(Action<string, Action> test)
     {
         ReviewCases.Run(test);
+        PictureCacheCases.Run(test);
         test("Renderer: 10000 labels/ports use a viewport broad phase", () => {
             using var r = new GraphRenderer(); Paint(r, Cases.Many(10000)); var s = r.Statistics;
             Cases.Check(s.VisibleLabels > 0 && s.VisibleLabels < 20 && s.VisiblePorts < 20 && s.ExaminedItems < 512);

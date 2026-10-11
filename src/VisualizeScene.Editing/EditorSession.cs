@@ -77,41 +77,6 @@ public sealed partial class EditorSession : IDisposable
         if (!double.IsFinite(GridSize) || GridSize <= 0) throw new InvalidOperationException("Grid size must be finite and positive.");
         return new(Math.Round(point.X / GridSize) * GridSize, Math.Round(point.Y / GridSize) * GridSize);
     }
-    public HitResult Hit(PointD world, bool handles = true)
-    {
-        LastHitStatistics = default;
-        var tolerance = 7 / Viewport.Zoom;
-        if (handles)
-        {
-            foreach (var id in selection)
-            {
-                if (index.Nodes.TryGetValue(id, out var node) && !node.Locked && index.IsVisible(id))
-                {
-                    var b = node.Bounds; PointD[] points = [new(b.X, b.Y), new(b.Right, b.Y), new(b.Right, b.Bottom), new(b.X, b.Bottom)];
-                    for (var i = 0; i < points.Length; i++) if (PointD.Distance(world, points[i]) <= tolerance) return new(HitKind.ResizeHandle, id, i);
-                }
-                if (index.Edges.TryGetValue(id, out var edge) && paths.TryGetValue(id, out var path))
-                {
-                    if (index.IsVisible(edge.SourceId) && !index.Nodes[edge.SourceId].Locked && PointD.Distance(world, path[0]) <= tolerance) return new(HitKind.SourceHandle, id);
-                    if (index.IsVisible(edge.TargetId) && !index.Nodes[edge.TargetId].Locked && PointD.Distance(world, path[^1]) <= tolerance) return new(HitKind.TargetHandle, id);
-                    if (!edge.Bends.IsDefault)
-                        for (var i = 0; i < edge.Bends.Length; i++) if (PointD.Distance(world, edge.Bends[i]) <= tolerance) return new(HitKind.Bend, id, i);
-                }
-            }
-        }
-        QueryHitCandidates(world, tolerance);
-        var port = HitPort(world, tolerance); if (port is not null) return new(HitKind.Port, port);
-        var label = HitLabel(); if (label is not null) return new(HitKind.Label, label);
-        var normal = HitNode(world, groupOnly: false); if (normal is not null) return new(HitKind.Node, normal.Id);
-        foreach (var id in hitEdges)
-        {
-            var points = paths[id];
-            for (var i = 1; i < points.Count; i++)
-                if (Geometry.DistanceToSegment(world, points[i - 1], points[i]) <= tolerance) return new(HitKind.Edge, id);
-        }
-        var group = HitNode(world, groupOnly: true);
-        return group is null ? new(HitKind.None) : new(HitKind.Node, group.Id);
-    }
     public string AddNode(PointD center)
     {
         var position = Snap(center - new PointD(65, 28)); var id = GraphEdit.NewId();

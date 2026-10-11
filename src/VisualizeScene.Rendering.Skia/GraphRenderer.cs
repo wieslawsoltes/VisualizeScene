@@ -7,7 +7,7 @@ namespace VisualizeScene.Rendering.Skia;
 
 public sealed record RenderOptions(bool ShowGrid = true, double GridSize = 10, IReadOnlySet<string>? Selection = null,
     RectD? Marquee = null, (PointD Start, PointD End)? EdgePreview = null, bool Overview = false, PointD? CandidatePosition = null, bool IsValidConnection = true, IReadOnlyList<AlignmentGuide>? AlignmentGuides = null, bool MarqueeContains = false, RectD? FocusBounds = null);
-public sealed record RenderStatistics(int VisibleNodes, int VisibleEdges, int CachedNodePictures, double CpuDrawMilliseconds, int VisibleLabels = 0, int VisiblePorts = 0, int ExaminedItems = 0);
+public sealed record RenderStatistics(int VisibleNodes, int VisibleEdges, int CachedNodePictures, double CpuDrawMilliseconds, int VisibleLabels = 0, int VisiblePorts = 0, int ExaminedItems = 0, int SelectionAdorners = 0);
 public sealed record RenderPreparationStatistics(int SceneBuilds, int NodeIndexBuilds, int EdgeIndexBuilds, int AnnotationIndexBuilds, int CreatedPaths, int ReusedPaths);
 
 /// <summary>Draws directly to the caller's Skia canvas, including Uno's shared composition surface. Dispose with the view.</summary>
@@ -24,7 +24,7 @@ public sealed partial class GraphRenderer : IDisposable
     private readonly List<string> visibleNodeIds = [], visibleEdgeIds = [];
     private readonly List<GraphNode> visibleGroups = [], visibleNodes = [];
     private int sceneBuilds, nodeIndexBuilds, edgeIndexBuilds, annotationIndexBuilds, createdPaths, reusedPaths;
-    private int frameLabels, framePorts, examinedItems;
+    private int frameLabels, framePorts, examinedItems, frameAdorners;
     public RenderPreparationStatistics PreparationStatistics => new(sceneBuilds, nodeIndexBuilds, edgeIndexBuilds, annotationIndexBuilds, createdPaths, reusedPaths);
     private readonly SKTypeface typeface;
     private readonly bool ownsTypeface;
@@ -56,8 +56,8 @@ public sealed partial class GraphRenderer : IDisposable
             order = snapshot.Nodes.Select((n, i) => (n.Id, i)).ToDictionary(p => p.Id, p => p.i);
             depths = snapshot.Nodes.ToDictionary(n => n.Id, n => index.Depth(n.Id));
             nodeIndex = new(snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => (n.Bounds, n.Id))); nodeIndexBuilds++;
-            foreach (var id in pictures.Keys.Where(id => !index.Nodes.ContainsKey(id)).ToArray())
-            { pictures[id].Picture.Dispose(); pictures.Remove(id); }
+            foreach (var id in pictures.Keys.Where(id => !index.Nodes.ContainsKey(id) || !index.IsVisible(id)).ToArray())
+            { DropPicture(true, id); }
         }
         if (geometryChanged || previous!.Edges != snapshot.Edges)
         {
@@ -98,7 +98,8 @@ public sealed partial class GraphRenderer : IDisposable
         }
         visibleNodes.Sort((a, b) => order[a.Id].CompareTo(order[b.Id]));
         visibleGroups.Sort((a, b) => { var c = depths[a.Id].CompareTo(depths[b.Id]); return c != 0 ? c : order[a.Id].CompareTo(order[b.Id]); });
-        frameLabels = framePorts = 0; examinedItems = nodeQuery.ExaminedEntries + edgeQuery.ExaminedEntries;
+        visibleLabels.Clear(); visiblePorts.Clear();
+        frameLabels = framePorts = frameAdorners = 0; examinedItems = nodeQuery.ExaminedEntries + edgeQuery.ExaminedEntries;
         var save = canvas.Save();
         try
         {
@@ -117,7 +118,7 @@ public sealed partial class GraphRenderer : IDisposable
             }
         }
         finally { canvas.RestoreToCount(save); }
-        Statistics = new(visibleNodeIds.Count, visibleEdgeIds.Count, pictures.Count, timer.Elapsed.TotalMilliseconds, frameLabels, framePorts, examinedItems);
+        Statistics = new(visibleNodeIds.Count, visibleEdgeIds.Count, pictures.Count, timer.Elapsed.TotalMilliseconds, frameLabels, framePorts, examinedItems, frameAdorners);
     }
     public byte[] ExportPng(GraphSnapshot snapshot, double scale = 1)
     {
@@ -133,7 +134,7 @@ public sealed partial class GraphRenderer : IDisposable
     public void Dispose()
     {
         if (disposed) return; disposed = true;
-        foreach (var entry in pictures.Values) entry.Picture.Dispose(); pictures.Clear(); foreach (var edge in edges.Values) edge.Path.Dispose(); edges.Clear();
+        DisposePictures(); foreach (var edge in edges.Values) edge.Path.Dispose(); edges.Clear();
         paint.Dispose(); shaper.Dispose(); if (ownsTypeface) typeface.Dispose();
         graph = null; index = null; measuredLabels.Clear(); ClearAnnotationCache(); visibleNodeIds.Clear(); visibleEdgeIds.Clear(); visibleNodes.Clear(); visibleGroups.Clear();
         nodeIndex = new([]); edgeIndex = new([]); order.Clear(); depths.Clear();

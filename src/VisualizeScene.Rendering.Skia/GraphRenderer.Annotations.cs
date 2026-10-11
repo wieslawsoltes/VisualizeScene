@@ -6,7 +6,7 @@ namespace VisualizeScene.Rendering.Skia;
 public sealed partial class GraphRenderer
 {
     private sealed record LabelVisual(GraphLabel Label, PointD Center, RectD Bounds, int Order);
-    private sealed record PortVisual(PointD Center, int Order);
+    private sealed record PortVisual(string Id, PointD Center, int Order);
     private SpatialIndex<LabelVisual> labelIndex = new([]);
     private SpatialIndex<PortVisual> portIndex = new([]);
     private readonly List<LabelVisual> visibleLabels = [];
@@ -23,13 +23,14 @@ public sealed partial class GraphRenderer
                 next[label.Id] = old;
             else next[label.Id] = new(label, center, GraphScene.LabelBounds(index!, label, MeasureLabel(label)), i);
         }
+        foreach (var id in labelPictures.Keys.Where(id => !next.ContainsKey(id)).ToArray()) DropPicture(false, id);
         labelVisuals = next;
         labelIndex = new(next.Values.Select(v => (v.Bounds, v)));
         var ports = new List<(RectD, PortVisual)>();
         for (var i = 0; i < snapshot.Ports.Length; i++)
         {
             var port = snapshot.Ports[i]; if (!index!.IsVisible(port.NodeId)) continue;
-            var p = index.PortLocation(port.Id); ports.Add((new(p.X, p.Y, 0, 0), new(p, i)));
+            var p = index.PortLocation(port.Id); ports.Add((new(p.X, p.Y, 0, 0), new(port.Id, p, i)));
         }
         portIndex = new(ports);
     }
