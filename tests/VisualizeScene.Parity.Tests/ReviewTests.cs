@@ -41,5 +41,19 @@ static class ReviewTests
                 x += 50 + column + 20;
             }
         });
+        test("Review: PageRank rejects nonfinite options instead of returning NaN scores", () => {
+            foreach (var value in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity }) {
+                Throws<ArgumentOutOfRangeException>(() => GraphAlgorithms.PageRank(GraphSnapshot.Empty, damping: value));
+                Throws<ArgumentOutOfRangeException>(() => GraphAlgorithms.PageRank(GraphSnapshot.Empty, tolerance: value));
+            }
+        });
+        test("Review: flow retains tiny positive capacities", () => {
+            var graph = new GraphSnapshot([new("a", new(0, 0, 100, 60)), new("b", new(200, 0, 100, 60))], [new("e", "a", "b", Weight: 1e-15)], [], []);
+            var flow = GraphAlgorithms.MaximumFlow(graph, "a", "b"); Check(flow.Value == 1e-15 && flow.EdgeFlows["e"] == 1e-15 && !flow.SourcePartition.Contains("b"));
+        });
+        test("Review: maximum-flow overflow is diagnosed instead of returned as infinity", () => {
+            var graph = new GraphSnapshot([new("a", new(0, 0, 100, 60)), new("b", new(200, 0, 100, 60))], [new("e", "a", "b", Weight: 1e308), new("f", "a", "b", Weight: 1e308)], [], []);
+            Throws<OverflowException>(() => GraphAlgorithms.MaximumFlow(graph, "a", "b"));
+        });
     }
 }

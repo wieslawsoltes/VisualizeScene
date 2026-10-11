@@ -30,9 +30,9 @@ revision, not this inventory, determines which checks passed.
 
 ## Explicit remaining findings and boundaries
 
-Numeric analysis still needs broader extreme-value coverage: PageRank's nonfinite option
+Historical PR #3 findings (the three named corrections below are now implemented by the recovered numeric patch; broader extreme-value coverage remains): PageRank's nonfinite option
 validation, tiny flow capacities and accumulated flow overflow were identified during
-review but their source changes are **not included in this PR**. Additional arithmetic
+review and were **not included in PR #3**. See `classic-shell.md` for their subsequent recovery. Additional arithmetic
 range/conditioning cases remain for shortest paths, centrality and geometry.
 
 Routing quality, specialized GraphML extensions/styles, accessibility graph peers,
