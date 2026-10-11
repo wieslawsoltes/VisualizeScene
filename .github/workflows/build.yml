@@ -21,6 +21,8 @@ jobs:
         run: dotnet run --project tests/VisualizeScene.Tests -c Release
       - name: Run editor interaction regressions
         run: dotnet run --project tests/VisualizeScene.Editing.Tests -c Release
+      - name: Run placement, snapping and selection regressions
+        run: dotnet run --project tests/VisualizeScene.Parity.Tests -c Release
       - name: Run bounded text layout regressions
         run: dotnet run --project tests/VisualizeScene.Rendering.Tests -c Release
       - name: Build reusable packages
@@ -93,6 +95,12 @@ jobs:
       - name: Browser ports, reconnection and modal labels
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/editing.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Browser automatic label placement and alignment guides
+        if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
+        run: python tests/browser/placement.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Browser area selection, previews and topology commands
+        if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
+        run: python tests/browser/selection.py http://127.0.0.1:8080/VisualizeScene/?test=1
       - name: Browser layouts, analysis, exports and samples
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/features.py http://127.0.0.1:8080/VisualizeScene/?test=1
@@ -111,6 +119,18 @@ jobs:
         with:
           name: browser-editing
           path: artifacts/browser-editing
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-placement
+          path: artifacts/browser-placement
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-selection
+          path: artifacts/browser-selection
 
   package-consumers:
     needs: [core, app]

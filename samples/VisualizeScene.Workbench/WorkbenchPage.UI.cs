@@ -36,10 +36,13 @@ public sealed partial class WorkbenchPage
             if (id is null) { status.Text = "Select a node first."; return; }
             var node = index.Nodes[id]; graph.Session.AddPort(id, new(node.Bounds.Right, node.Bounds.Center.Y));
         }, "AddPort");
-        var view = Menu("View"); Item(view, "Fit graph  Home", graph.Fit); Item(view, "Zoom in", () => graph.Zoom(1.25)); Item(view, "Zoom out", () => graph.Zoom(.8)); Item(view, "Toggle grid", () => { graph.Session.ShowGrid = !graph.Session.ShowGrid; graph.Invalidate(); }); Item(view, "Toggle snapping", () => graph.Session.SnapToGrid = !graph.Session.SnapToGrid);
+        var view = Menu("View"); Item(view, "Fit graph  Home", graph.Fit); Item(view, "Zoom in", () => graph.Zoom(1.25)); Item(view, "Zoom out", () => graph.Zoom(.8)); Item(view, "Toggle grid", () => { graph.Session.ShowGrid = !graph.Session.ShowGrid; graph.Invalidate(); }); Item(view, "Toggle grid snapping", () => graph.Session.SnapToGrid = !graph.Session.SnapToGrid, "ToggleGridSnap");
+        var snapItems = new ToggleMenuFlyoutItem { Text = "Alignment guides", IsChecked = graph.Session.SnapToItems };
+        Register("ToggleItemSnap", snapItems); snapItems.Click += (_, _) => graph.Session.SnapToItems = snapItems.IsChecked; view.Items.Add(snapItems);
         var arrange = Menu("Arrange"); Item(arrange, "Group  Ctrl+G", graph.Session.Group); Item(arrange, "Ungroup  Ctrl+Shift+G", graph.Session.Ungroup); Item(arrange, "Fold / unfold selected groups", FoldSelected);
         arrange.Items.Add(new MenuFlyoutSeparator()); foreach (var alignment in Enum.GetValues<Alignment>()) Item(arrange, alignment.ToString(), () => graph.Session.Align(alignment));
-        var layout = Menu("Layout"); foreach (var kind in Enum.GetValues<LayoutKind>()) Item(layout, kind.ToString(), () => { layoutKind.SelectedItem = kind; _ = ApplyLayout(); }, "Layout" + kind); Item(layout, "Route edges around obstacles", () => _ = RouteEdges());
+        var layout = Menu("Layout"); foreach (var kind in Enum.GetValues<LayoutKind>()) Item(layout, kind.ToString(), () => { layoutKind.SelectedItem = kind; _ = ApplyLayout(); }, "Layout" + kind); Item(layout, "Route edges around obstacles", () => _ = RouteEdges()); Item(layout, "Place independent labels", () => _ = PlaceLabels(), "MenuPlaceLabels");
+        AddSelectionMenu(bar);
         var help = Menu("Help"); Item(help, "Editing guide", () => _ = ShowHelp()); Item(help, "Implementation status", () => _ = ShowStatus()); return bar;
     }
     private FrameworkElement BuildToolbar()
@@ -72,6 +75,7 @@ public sealed partial class WorkbenchPage
         var layoutPanel = new StackPanel { Spacing = 12 }; layoutKind.Header = "Layout algorithm"; direction.Header = "Direction"; Register("LayoutKind", layoutKind); layoutPanel.Children.Add(layoutKind); layoutPanel.Children.Add(direction); layoutPanel.Children.Add(spacing); layoutPanel.Children.Add(layers);
         layoutPanel.Children.Add(Button("Apply layout", "ApplyLayout", () => _ = ApplyLayout())); layoutPanel.Children.Add(Button("Route edges", "RouteEdges", () => _ = RouteEdges())); layoutPanel.Children.Add(Button("Cancel operation", "CancelLayout", () => layoutCancellation?.Cancel()));
         layoutPanel.Children.Add(new TextBlock { Text = "Layouts use an immutable snapshot, commit once and can be undone. Stale results are rejected.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = Brush("#657688") });
+        AddLabelPlacementControls(layoutPanel);
         var analysis = new StackPanel { Spacing = 8 };
         foreach (var name in new[] { "Connected components", "Strong components", "Shortest path", "Minimum spanning forest", "PageRank", "Betweenness", "Color graph", "Maximum flow" }) analysis.Children.Add(Button(name, "Analyze" + name.Replace(" ", ""), () => Analyze(name)));
         analysis.Children.Add(new Border { Height = 1, Background = Brush("#CDD5DE"), Margin = new(0, 8, 0, 8) }); analysis.Children.Add(analysisOutput);

@@ -111,6 +111,8 @@ public sealed partial class GraphControl
         {
             switch (args.Key)
             {
+                case VirtualKey.A when control && shift: Session.ClearSelection(); break;
+                case VirtualKey.I when control: Session.InvertSelection(); break;
                 case VirtualKey.A when control: Session.SelectAll(); break;
                 case VirtualKey.C when control: Session.Copy(); break;
                 case VirtualKey.X when control: Session.Copy(); Session.DeleteSelection(); break;

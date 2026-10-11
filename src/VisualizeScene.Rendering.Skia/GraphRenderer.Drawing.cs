@@ -117,7 +117,14 @@ public sealed partial class GraphRenderer
                 Endpoint(picture.Points[0], edge.SourceId); Endpoint(picture.Points[^1], edge.TargetId);
             }
         }
-        if (options.Marquee is { } marquee) { Use(new SKColor(0, 112, 215, 24)); canvas.DrawRect(Rect(marquee), paint); Use(accent, SKPaintStyle.Stroke, (float)(1 / zoom)); canvas.DrawRect(Rect(marquee), paint); }
+        if (options.Marquee is { } marquee)
+        {
+            var color = options.MarqueeContains ? accent : new SKColor(35, 139, 82);
+            Use(color.WithAlpha(24)); canvas.DrawRect(Rect(marquee), paint);
+            Use(color, SKPaintStyle.Stroke, (float)(1 / zoom));
+            using var dash = options.MarqueeContains ? null : SKPathEffect.CreateDash([(float)(5 / zoom), (float)(3 / zoom)], 0);
+            paint.PathEffect = dash; canvas.DrawRect(Rect(marquee), paint); paint.PathEffect = null;
+        }
         var connectionColor = options.IsValidConnection ? new SKColor(34, 142, 84) : new SKColor(196, 48, 48);
         if (options.EdgePreview is { } preview) { Use(connectionColor, SKPaintStyle.Stroke, (float)(1.5 / zoom)); canvas.DrawLine(Point(preview.Start), Point(preview.End), paint); Use(connectionColor); canvas.DrawCircle(Point(preview.End), (float)(4 / zoom), paint); }
         if (options.CandidatePosition is { } candidate)

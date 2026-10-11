@@ -20,7 +20,7 @@ public sealed partial class GraphControl : ContentControl, IDisposable
         {
             if (owner.disposed) return;
             var s = owner.Session;
-            owner.renderer.Render(canvas, s.DisplayGraph, s.Viewport, area.Width, area.Height, new(s.ShowGrid, s.GridSize, s.Selection, s.Marquee, s.EdgePreview, CandidatePosition: s.CandidatePosition, IsValidConnection: s.CandidateDecision.Allowed));
+            owner.renderer.Render(canvas, s.DisplayGraph, s.Viewport, area.Width, area.Height, new(s.ShowGrid, s.GridSize, s.DisplaySelection, s.Marquee, s.EdgePreview, CandidatePosition: s.CandidatePosition, IsValidConnection: s.CandidateDecision.Allowed, AlignmentGuides: s.AlignmentGuides, MarqueeContains: s.IsMarqueeContainment));
             owner.FrameRendered?.Invoke(owner, EventArgs.Empty);
         }
     }

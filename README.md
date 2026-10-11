@@ -8,11 +8,11 @@ An independent, modular graph visualization and editing toolkit, with an **Uno P
 
 The workbench brings together a graph editor, node palette, overview, property inspector, layout controls and graph analysis. It uses Uno's shared Skia rendering surface rather than a separate HTML/JavaScript graph engine. Desktop and browser hosts reference the same control library and core packages.
 
-The GitHub Pages workflow deploys the browser artifact only after the main-branch build and browser tests succeed. The intended app address is **https://wieslawsoltes.github.io/VisualizeScene/**. A successful deployment must be confirmed in the repository's Actions and Pages environments; the presence of this link is not proof of a deployment.
+The browser demo is available at **https://wieslawsoltes.github.io/VisualizeScene/**. The Pages workflow deploys the browser artifact only after the main-branch build, browser scenarios and isolated package consumers succeed.
 
 ### Editing
 
-Select and drag nodes; use corner handles to resize. Drag empty canvas for marquee selection, and Ctrl+click for additive selection. Choose a palette shape and click the canvas to create it. In Edge mode, click a source node or port, then a target. Double-click labels to edit them, or Ctrl+double-click an edge to insert a bend. Group headers can be folded and unfolded.
+Select and drag nodes; use corner handles to resize. Drag empty canvas for marquee selection, Shift+click to add items, and Ctrl+click to toggle them. Choose a palette shape and click the canvas to create it. In Edge mode, click a source node or port, then a target. Double-click labels to edit them, or Ctrl+double-click an edge to insert a bend. Group headers can be folded and unfolded.
 
 Drag the circular handles on a selected edge to reconnect its source or target. Invalid drops and Escape leave the original edge unchanged. Add ports through the Edit menu, then drag them or edit their relative coordinates in the inspector. Connection rules are supplied through the reusable `IConnectionPolicy`.
 
@@ -29,14 +29,22 @@ Mouse-wheel zoom is anchored at the pointer. Middle-button drag or Pan mode move
 | Arrow keys / Shift+arrow | Move by 1 / 10 units |
 | Home / Escape | Fit graph / cancel gesture and select mode |
 
+### Placement, snapping and selection
+
+Use **Layout → Place independent labels** or the Layout panel to place independent annotations around graph elements. The panel exposes clearance, selected-only placement and remaining conflict counts. Placement changes label offsets only, commits once and supports undo; it does not guarantee a collision-free result.
+
+Node movement and resize corners snap to nearby node boundaries or centers, with guides drawn in the existing Skia canvas. **View → Alignment guides** controls magnetic snapping independently of grid snapping.
+
+The **Selection** menu filters nodes, edges, ports, labels or groups, inverts/clears the selection and expands incoming/outgoing neighbors. Marquee modes are intersecting, fully contained, or directional: drag right for a containment window and left for crossing selection. A solid blue rectangle indicates containment; a dashed green rectangle indicates crossing. Dragging previews highlights without changing the committed selection until release. Escape restores the original selection. Shift adds, Control toggles and Control+Shift subtracts. Ctrl+I inverts; Ctrl+Shift+A clears.
+
 ## Reusable packages
 
 | Package | Contents |
 |---|---|
 | `VisualizeScene.Core` | Geometry, immutable graph snapshots, validation, atomic edits, undo/redo, groups, ports, labels, spatial index |
 | `VisualizeScene.Algorithms` | Traversal, connectivity, shortest paths, spanning forests, PageRank, betweenness, coloring, maximum flow |
-| `VisualizeScene.Layout` | Hierarchical, organic, tree, radial, circular and grid layouts; obstacle-aware orthogonal routing |
-| `VisualizeScene.Editing` | Platform-neutral gestures, connection policies, reconnection, port/label editing, selection, clipboard, snapping, grouping and alignment |
+| `VisualizeScene.Layout` | Six graph layouts, obstacle-aware orthogonal routing and automatic independent-label placement |
+| `VisualizeScene.Editing` | Platform-neutral gestures, connection policies, reconnection, port/label editing, indexed selection, clipboard, magnetic snapping, grouping and alignment |
 | `VisualizeScene.Serialization` | Versioned JSON, GraphML interchange subset, standalone SVG |
 | `VisualizeScene.Rendering.Skia` | Retained node pictures, shaped text, culling, selection adorners and PNG export |
 | `VisualizeScene.Controls.Uno` | `GraphControl`, `GraphOverview`, `NodePalette`, `GraphPropertyInspector` |
@@ -88,6 +96,7 @@ dotnet workload install wasm-tools
 dotnet run --project tests/VisualizeScene.Tests -c Release
 dotnet run --project tests/VisualizeScene.Editing.Tests -c Release
 dotnet run --project tests/VisualizeScene.Rendering.Tests -c Release
+dotnet run --project tests/VisualizeScene.Parity.Tests -c Release
 
 dotnet run --project samples/VisualizeScene.Workbench -f net10.0-desktop
 dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-browserwasm
@@ -106,14 +115,16 @@ A standalone Linux rendering host must provide the matching SkiaSharp and HarfBu
 
 ## Validation and deployment
 
-`Build and validate` runs the core conformance, editing/geometry and bounded text-layout regressions, builds desktop, publishes the actual Uno WebAssembly application, packages the controls, and runs Playwright pointer/keyboard tests against that application. Artifacts include source, NuGet packages, browser distribution, test reports and screenshots.
+`Build and validate` runs core conformance, editing/geometry, placement/snapping/selection and bounded text-layout regressions, builds desktop, publishes the actual Uno WebAssembly application, packages the controls, and runs Playwright pointer/keyboard tests against that application. Artifacts include source, NuGet packages, browser distribution, test reports and screenshots.
 
-The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. The three browser suites cover baseline interactions; ports, reconnection and independent labels; and layouts, analysis, exports, file round trips and all sample graphs. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
+The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. Five browser suites cover baseline interactions; ports, reconnection and independent labels; automatic placement and snapping; advanced selection; and layouts, analysis, exports, file round trips and all sample graphs. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
 
 ## Documentation
 
 - [Architecture and package contracts](docs/architecture.md)
 - [Capability matrix and remaining parity work](docs/capabilities.md)
+- [Label placement and snapping](docs/label-placement-and-snapping.md)
+- [Selection contracts](docs/selection.md)
 
 ## License
 
