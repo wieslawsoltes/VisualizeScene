@@ -5,6 +5,14 @@ namespace VisualizeScene.Rendering.Skia;
 
 public sealed partial class GraphRenderer
 {
+    private void DrawKeyboardFocus(SKCanvas canvas, RectD bounds, double zoom)
+    {
+        var rect = Rect(bounds.Inflate(5 / zoom));
+        Use(SKColors.White, SKPaintStyle.Stroke, (float)(3 / zoom)); canvas.DrawRect(rect, paint);
+        Use(new SKColor(25, 36, 47), SKPaintStyle.Stroke, (float)(1.5 / zoom));
+        using var dash = SKPathEffect.CreateDash([(float)(3 / zoom), (float)(3 / zoom)], 0);
+        paint.PathEffect = dash; canvas.DrawRect(rect, paint); paint.PathEffect = null;
+    }
     private void DrawAlignmentGuides(SKCanvas canvas, double zoom, IReadOnlyList<AlignmentGuide>? guides)
     {
         if (guides is null || guides.Count == 0) return;

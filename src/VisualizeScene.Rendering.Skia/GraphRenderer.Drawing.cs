@@ -74,12 +74,11 @@ public sealed partial class GraphRenderer
     }
     private void DrawLabels(SKCanvas canvas, GraphSnapshot snapshot, RectD view)
     {
-        foreach (var label in snapshot.Labels)
+        visibleLabels.Clear(); var query = labelIndex.Query(view, visibleLabels); examinedItems += query.ExaminedEntries;
+        visibleLabels.Sort((a, b) => a.Order.CompareTo(b.Order));
+        foreach (var visual in visibleLabels)
         {
-            if (!GraphScene.IsOwnerVisible(index!, label.OwnerId)) continue;
-            var center = GraphScene.LabelAnchor(index!, label.OwnerId) + label.Offset;
-            var bounds = GraphScene.LabelBounds(index!, label, MeasureLabel(label));
-            if (view.Intersects(bounds)) DrawText(canvas, label.Text, center, label.FontSize, background: true);
+            DrawText(canvas, visual.Label.Text, visual.Center, visual.Label.FontSize, background: true); frameLabels++;
         }
     }
     private void DrawSelection(SKCanvas canvas, double zoom, RenderOptions options)

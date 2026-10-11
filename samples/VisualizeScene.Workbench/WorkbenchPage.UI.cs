@@ -39,6 +39,7 @@ public sealed partial class WorkbenchPage
         var view = Menu("View"); Item(view, "Fit graph  Home", graph.Fit); Item(view, "Zoom in", () => graph.Zoom(1.25)); Item(view, "Zoom out", () => graph.Zoom(.8)); Item(view, "Toggle grid", () => { graph.Session.ShowGrid = !graph.Session.ShowGrid; graph.Invalidate(); }); Item(view, "Toggle grid snapping", () => graph.Session.SnapToGrid = !graph.Session.SnapToGrid, "ToggleGridSnap");
         var snapItems = new ToggleMenuFlyoutItem { Text = "Alignment guides", IsChecked = graph.Session.SnapToItems };
         Register("ToggleItemSnap", snapItems); snapItems.Click += (_, _) => graph.Session.SnapToItems = snapItems.IsChecked; view.Items.Add(snapItems);
+        AddNavigationMenu(view);
         var arrange = Menu("Arrange"); Item(arrange, "Group  Ctrl+G", graph.Session.Group); Item(arrange, "Ungroup  Ctrl+Shift+G", graph.Session.Ungroup); Item(arrange, "Fold / unfold selected groups", FoldSelected);
         arrange.Items.Add(new MenuFlyoutSeparator()); foreach (var alignment in Enum.GetValues<Alignment>()) Item(arrange, alignment.ToString(), () => graph.Session.Align(alignment));
         var layout = Menu("Layout"); foreach (var kind in Enum.GetValues<LayoutKind>()) Item(layout, kind.ToString(), () => { layoutKind.SelectedItem = kind; _ = ApplyLayout(); }, "Layout" + kind); Item(layout, "Route edges around obstacles", () => _ = RouteEdges()); Item(layout, "Place independent labels", () => _ = PlaceLabels(), "MenuPlaceLabels");

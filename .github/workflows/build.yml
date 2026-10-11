@@ -23,6 +23,8 @@ jobs:
         run: dotnet run --project tests/VisualizeScene.Editing.Tests -c Release
       - name: Run placement, snapping and selection regressions
         run: dotnet run --project tests/VisualizeScene.Parity.Tests -c Release
+      - name: Run touch and keyboard navigation regressions
+        run: dotnet run --project tests/VisualizeScene.Navigation.Tests -c Release
       - name: Run bounded text layout regressions
         run: dotnet run --project tests/VisualizeScene.Rendering.Tests -c Release
       - name: Build reusable packages
@@ -101,6 +103,9 @@ jobs:
       - name: Browser area selection, previews and topology commands
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/selection.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Browser touch and keyboard navigation
+        if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
+        run: python tests/browser/navigation.py http://127.0.0.1:8080/VisualizeScene/?test=1
       - name: Browser layouts, analysis, exports and samples
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/features.py http://127.0.0.1:8080/VisualizeScene/?test=1
@@ -131,6 +136,12 @@ jobs:
         with:
           name: browser-selection
           path: artifacts/browser-selection
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-navigation
+          path: artifacts/browser-navigation
 
   package-consumers:
     needs: [core, app]

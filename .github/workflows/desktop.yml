@@ -36,3 +36,5 @@ jobs:
           path: artifacts/desktop
       - name: Run portable contracts on native host
         run: dotnet run --project tests/VisualizeScene.Tests -c Release
+      - name: Run navigation contracts on native host
+        run: dotnet run --project tests/VisualizeScene.Navigation.Tests -c Release
