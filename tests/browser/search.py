@@ -44,7 +44,10 @@ with sync_playwright() as p:
     def fill(name, text):
         click(name)
         page.keyboard.press("Control+a")
-        page.keyboard.insert_text(text)
+        if text:
+            page.keyboard.insert_text(text)
+        else:
+            page.keyboard.press("Backspace")
     def find(text, count):
         fill("SearchQuery", text)
         wait("v.search.ready && v.search.query === "+json.dumps(text)+f" && v.search.count === {count}")
@@ -112,9 +115,12 @@ with sync_playwright() as p:
         page.mouse.click(*node_point("a")); open_replace(); click("SearchSelection"); find("alpha",3)
         click("SearchNext"); wait("v.search.current === 1 && v.search.count === 3")
         record("Captured-selection scope is stable while navigating results")
-        click("SearchSelection"); choose_kind(3); find("Alpha",1)
-        wait("v.selection[0] === 'la'")
-        record("Item-kind filter isolates independent labels")
+        click("SearchSelection"); choose_kind(3)
+        for _ in range(8): click("ZoomOut")
+        wait("v.zoom < .25")
+        find("Alpha",1)
+        wait("v.selection[0] === 'la' && v.zoom >= .25")
+        record("Item-kind filter isolates and reveals labels above the low-detail threshold")
         choose_kind(0); find("😀",1); wait("v.selection[0] === 'unicode'")
         find("Καλημέρα",1)
         assert state()["model"]==before

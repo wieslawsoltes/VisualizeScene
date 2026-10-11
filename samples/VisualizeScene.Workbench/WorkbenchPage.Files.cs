@@ -10,21 +10,29 @@ namespace VisualizeScene.Workbench;
 
 public sealed partial class WorkbenchPage
 {
+    private long fileRequest;
     private async Task OpenFile()
     {
+        var request = ++fileRequest; var revision = document.Revision;
         var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary }; picker.FileTypeFilter.Add(".json"); picker.FileTypeFilter.Add(".graphml"); picker.FileTypeFilter.Add(".xml");
-        var file = await picker.PickSingleFileAsync(); if (file is null) return; var text = await FileIO.ReadTextAsync(file); if (!await ConfirmDiscard()) return; Import(text); currentName = file.Name; dirty = false;
+        var file = await picker.PickSingleFileAsync(); if (file is null) return; var text = await FileIO.ReadTextAsync(file);
+        if (request != fileRequest) return;
+        if (document.Revision != revision) throw new InvalidOperationException("The graph changed while the file picker was open. Open the file again to replace the current graph.");
+        if (!await ConfirmDiscard()) return;
+        if (request != fileRequest) return;
+        Import(text, revision); currentName = file.Name; dirty = false;
     }
-    private void Import(string text)
+    private void Import(string text, long? expectedRevision = null)
     {
         var import = text.TrimStart().StartsWith('<') ? GraphIO.FromGraphML(text) : new GraphImportResult(GraphIO.FromJson(text), []);
-        document.Replace(import.Graph, "Import graph"); graph.Fit(); status.Text = import.Diagnostics.Count == 0 ? "Graph imported." : string.Join(" ", import.Diagnostics);
+        document.Replace(import.Graph, "Import graph", expectedRevision: expectedRevision); graph.Fit(); status.Text = import.Diagnostics.Count == 0 ? "Graph imported." : string.Join(" ", import.Diagnostics);
     }
     private async Task Save(string extension)
     {
         await RunAsync(async () =>
         {
-            var bytes = extension switch { "png" => graph.ExportPng(), "svg" => Encoding.UTF8.GetBytes(SvgExporter.Export(document.Snapshot, graph.MeasureLabel)), "graphml" => Encoding.UTF8.GetBytes(GraphIO.ToGraphML(document.Snapshot)), _ => Encoding.UTF8.GetBytes(GraphIO.ToJson(document.Snapshot)) };
+            var revision = document.Revision; var snapshot = document.Snapshot;
+            var bytes = extension switch { "png" => graph.ExportPng(), "svg" => Encoding.UTF8.GetBytes(SvgExporter.Export(snapshot, graph.MeasureLabel)), "graphml" => Encoding.UTF8.GetBytes(GraphIO.ToGraphML(snapshot)), _ => Encoding.UTF8.GetBytes(GraphIO.ToJson(snapshot)) };
             var name = "visualizescene." + extension;
 #if __WASM__
             var mime = extension switch { "png" => "image/png", "svg" => "image/svg+xml", "graphml" => "application/graphml+xml", _ => "application/json" };
@@ -33,16 +41,19 @@ public sealed partial class WorkbenchPage
             var picker = new FileSavePicker { SuggestedFileName = "visualizescene", SuggestedStartLocation = PickerLocationId.DocumentsLibrary }; picker.FileTypeChoices.Add(extension.ToUpperInvariant(), ["." + extension]);
             var file = await picker.PickSaveFileAsync(); if (file is null) return; await FileIO.WriteBytesAsync(file, bytes);
 #endif
-            if (extension is "json" or "graphml") dirty = false; status.Text = "Saved " + name;
+            var stillCurrent = revision == document.Revision;
+            if (stillCurrent && extension is ("json" or "graphml")) dirty = false;
+            status.Text = "Saved " + name + (stillCurrent ? "" : " (earlier revision; current changes remain unsaved).");
         });
     }
     private async Task TextExchange(bool import)
     {
         await RunAsync(async () =>
         {
+            var revision = document.Revision;
             var text = new TextBox { Text = import ? "" : GraphIO.ToJson(document.Snapshot), AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, FontFamily = new FontFamily("Consolas"), FontSize = 11, Width = 600, Height = 400, IsReadOnly = !import }; Register("GraphSource", text);
             var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = import ? "Import JSON or GraphML" : "Graph document · JSON", Content = text, PrimaryButtonText = import ? "Import" : "", CloseButtonText = "Close" };
-            if (await dialog.ShowAsync() == ContentDialogResult.Primary && import) Import(text.Text);
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary && import) Import(text.Text, revision);
         });
     }
     private Task ShowHelp() => ShowMessage("Editing guide", "Select: drag a node to move it; drag empty canvas for a selection rectangle. Ctrl+click adds or removes items.\n\nDouble-click a node or edge to edit its label. Double-click empty canvas to create a node. Ctrl+double-click an edge inserts a bend. Drag selected corners or bends to reshape.\n\nNode mode: click to create nodes. Edge mode: click a source and then a target; ports are supported. Pan mode or middle-button drag moves the viewport. The wheel zooms around the pointer.\n\nCtrl+Z/Y: undo/redo. Ctrl+C/V/D: copy/paste/duplicate. Ctrl+G: group. Ctrl+Shift+G: ungroup. F2: label. Delete: remove. Home: fit. Escape: cancel and select.\n\nDouble-click group headers to fold/unfold. All graph edits and layouts are undoable.");

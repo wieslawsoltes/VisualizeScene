@@ -22,6 +22,8 @@ public sealed partial class GraphControl
         var revision = Document.Revision;
         Session.Select([target]);
         if (Document.Revision != revision || !Session.FocusItem(target)) return false;
+        if (visible && index.Labels.ContainsKey(id) && Session.Viewport.Zoom < .25)
+            Session.Viewport.ZoomAt(new(ActualWidth / 2, ActualHeight / 2), 1 / Session.Viewport.Zoom);
         showKeyboardFocus = true; EnsureFocusedItemVisible(); return Document.Revision == revision;
     }
 }

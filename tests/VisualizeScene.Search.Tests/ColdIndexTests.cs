@@ -10,6 +10,19 @@ static class ColdIndexTests
         [new("ab", "a", "b")], [new("ap", "a", new(.5, .5))], [new("la", "a", "Label", new())]);
     public static void Run(Action<string, Action> test)
     {
+        test("Document lease: stale replacement never edits or clears history", () => {
+            var document = new GraphDocument(); document.Replace(Graph()); var revision = document.Revision;
+            document.Edit("move", edit => edit.Move(["a"], new(10, 0))); var before = document.Snapshot;
+            Throws<InvalidOperationException>(() => document.Replace(GraphSnapshot.Empty, clearHistory: true, expectedRevision: revision));
+            Check(ReferenceEquals(document.Snapshot, before) && document.CanUndo);
+            document.Replace(GraphSnapshot.Empty, expectedRevision: document.Revision); Check(document.Snapshot.Nodes.IsEmpty);
+            document.Undo(); Check(ReferenceEquals(document.Snapshot, before));
+        });
+        test("Document lease: no-op replacements still reject stale revision", () => {
+            var document = new GraphDocument(); document.Replace(Graph()); var revision = document.Revision;
+            document.Edit("move", edit => edit.Move(["a"], new(10, 0))); document.Undo();
+            Throws<InvalidOperationException>(() => document.Replace(document.Snapshot, expectedRevision: revision));
+        });
         test("Cold index: validation maps are reused by independently constructed indexes", () => {
             var graph = Graph(); GraphValidation.Validate(graph); var a = new GraphIndex(graph); var b = new GraphIndex(graph);
             Check(ReferenceEquals(a.Nodes, b.Nodes) && ReferenceEquals(a.Edges, b.Edges) && ReferenceEquals(a.Ports, b.Ports) && ReferenceEquals(a.Labels, b.Labels));
