@@ -65,4 +65,16 @@ Check(bitmap is not null && bitmap.Width == (int)Math.Ceiling(expected.Width) &&
 using var surface = SKSurface.Create(new SKImageInfo(400, 300)) ?? throw new InvalidOperationException("No raster surface");
 renderer.Render(surface.Canvas, document.Snapshot, new Viewport(), 400, 300);
 Check(renderer.Statistics.VisibleNodes > 0, "caller-owned canvas rendering");
+renderer.PictureCacheCapacity = 2;
+renderer.Render(surface.Canvas, document.Snapshot, new Viewport(), 400, 300);
+Check(renderer.PictureStatistics.Retained <= 2, "packaged native picture budget");
+var isolatedEdit = new GraphEdit(document.Snapshot);
+var originalBounds = isolatedEdit.Node("a").Bounds;
+isolatedEdit.SetNodeBounds("a", originalBounds.Move(new PointD(12, 15)));
+Check(isolatedEdit.Node("a").Bounds.X == originalBounds.X + 12, "packaged bounds editing API");
+var removal = isolatedEdit.RemoveRange(["a", "b"]);
+var removedGraph = isolatedEdit.Build();
+GraphValidation.Validate(removedGraph);
+Check(removal.Nodes == 2 && removedGraph.Nodes.IsEmpty && removedGraph.Edges.IsEmpty && removedGraph.Labels.IsEmpty,
+    "packaged bulk removal cascades dependents");
 Console.WriteLine("Package-only consumer passed; no source project references.");

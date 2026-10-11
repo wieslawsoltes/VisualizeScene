@@ -45,14 +45,17 @@ diagnostic bridge, and there are no test-only graph mutation functions.
 These are focused optimizations, not a claim that every edit is O(changed items).
 Cold graph indexing/validation traverses the graph. Spatial index construction still
 sorts partitions. Editing a touched collection still copies that collection, and changed
-node geometry can rebuild scene indexes. Selection-handle hit testing still traverses
-selected items. Keyboard directional navigation scans its cached candidate registry once.
+node geometry can rebuild scene indexes. Selected-handle ranks are built once per
+immutable selection; subsequent handle tests query nearby node/edge candidates only.
+Keyboard directional navigation scans its cached candidate registry once.
 
 Annotation indexes retain per-label geometry for a revision, increasing retained state in
-exchange for reduced frame work. Node pictures are retained by node ID and released on
-removal/disposal; there is no native-memory-byte budget or independent-label picture LRU
-in this revision. Large histories retain their snapshots intentionally and remain bounded
-by entry count, not bytes. Route-cache lookups still have some delegate allocation. Cold
+exchange for reduced frame work. Node and independent-label pictures share an LRU
+entry budget (default 4,096, configurable from zero to 65,536). Eviction, budget reduction,
+removal and disposal release native pictures. Zero disables retention. This is not a
+native-memory-byte budget; long labels or complex pictures may vary greatly in size.
+Large histories retain their snapshots intentionally and remain bounded by entry count,
+not bytes. Route-cache lookups still have some delegate allocation. Cold
 preparation can trade time/memory for faster warm interactions and must be reported separately.
 
 ## Correctness gates
@@ -80,8 +83,10 @@ Tiered compilation is disabled for both. Builds/restores are outside measured se
 The fixture contains 10,000 nodes, 9,900 short local edges, 10,000 relative ports and
 10,000 independent labels. The raster viewport is 800 × 400 at zoom 1. Operations cover
 warm snapshot indexing, warm validation, local hit testing, connection candidates,
-label edit/build, node drag previews, warm rendering, cold renderer preparation and
-indexing a new snapshot. Every workload is warmed, sampled repeatedly and reported with
+default connection policy, selected-handle hit testing, selected rendering, label
+edit/build, node drag previews, warm rendering, cold renderer preparation and indexing
+a new snapshot. Two additional workloads cover deleting 1,000 nodes (including temporary
+document/editor construction) and laying out 10,000 nodes in a grid. Every workload is warmed, sampled repeatedly and reported with
 median/p95 elapsed time and median current-thread managed allocation per operation.
 
 Cold renderer timings include renderer construction, first preparation and disposal,
@@ -97,3 +102,38 @@ one viewport/fixture to all graph densities, label lengths or layout workloads.
 These are **CPU/raster and managed-allocation measurements**, not GPU timestamps, browser
 presentation FPS, input latency, power consumption, physical touchscreen or native
 Windows/macOS GUI certification. Skia's interactive backend is still selected by Uno.
+
+## Review-driven optimizations
+
+`GraphEdit.RemoveRange` materializes requested IDs before mutation, discovers subtree,
+port, edge and label dependencies once, and detaches removed ports from surviving edges.
+`EditorSession.DeleteSelection` uses one batch operation. The result includes examined-item
+counts; a 10,000-node / 10,000-port / 10,000-label fixture visits 30,000 items, not a full
+scan for every selected ID. Invalid lazy input leaves the transaction unchanged.
+
+Default `ConnectionPolicy` checks no edge list. Optional degree, parallel-edge and port
+capacity rules use endpoint adjacency; cycle prevention traverses reachable topology.
+Undirected edges, self-loops and replaced-edge exclusions retain their original semantics,
+covered by randomized comparisons against exhaustive reference counting.
+
+Independent-label pictures record the original world-coordinate text commands, avoiding
+additional floating-point translation when replayed. Cached and uncached outputs are
+compared byte-for-byte at fractional camera transforms. Label movement, text and font
+changes invalidate pictures. Node style comparisons avoid per-frame temporary records.
+
+Selection adorners use visible scene candidates and constant-time membership tests,
+not every item in a large selection. Their counter is separate from graph preparation.
+Selected handles preserve the immutable selection's priority order even after spatial
+culling, including handles outside node bounds. The renderer and editor remain
+single-threaded view objects; caches are not a license for concurrent drawing or mutation.
+
+Layout placement replaces per-node linear identity searches with indexed lookup, computes
+grid column maxima in one pass and looks up group children instead of rescanning all
+nodes at each level. Compound layout still projects edges per group and is not generally
+linear in the whole graph's size.
+
+Equivalent reconstructed bend arrays no longer create history entries. Property edits
+preserve round-trip double precision; moving a group's properties translates its children
+and internal bends once. Minimum-size corner resizing keeps the opposite corner fixed.
+These correctness checks accompany the performance changes, rather than relying on
+wall-clock ratios alone.
