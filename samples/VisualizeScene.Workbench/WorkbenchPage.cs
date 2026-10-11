@@ -12,6 +12,7 @@ public sealed partial class WorkbenchPage : Page
     private readonly GraphDocument document = new();
     private readonly GraphControl graph = new();
     private readonly GraphOverview overview = new();
+    private readonly GraphSearchControl search = new();
     private readonly GraphPropertyInspector inspector = new();
     private readonly TextBlock status = new() { Text = "Ready", FontSize = 11, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TextBlock counts = new() { FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
@@ -33,13 +34,14 @@ public sealed partial class WorkbenchPage : Page
 
     public WorkbenchPage()
     {
-        Background = Brush("#F1F3F5"); graph.Document = document; overview.Target = graph; inspector.Target = graph;
+        Background = Brush("#F1F3F5"); graph.Document = document; overview.Target = graph; inspector.Target = graph; search.Target = graph;
         document.Replace(SampleGraphs.Flowchart(), clearHistory: true);
         var root = new Grid(); root.RowDefinitions.Add(new() { Height = GridLength.Auto }); root.RowDefinitions.Add(new() { Height = GridLength.Auto }); root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height = new(27) });
-        root.Children.Add(BuildMenu()); var toolbar = BuildToolbar(); Grid.SetRow(toolbar, 1); root.Children.Add(toolbar);
+        var menu = BuildMenu(); AddSearchMenu(menu); root.Children.Add(menu); var toolbar = BuildToolbar(); Grid.SetRow(toolbar, 1); root.Children.Add(toolbar);
         workspace.ColumnDefinitions.Add(new() { Width = new(210) }); workspace.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); workspace.ColumnDefinitions.Add(new() { Width = new(280) });
         leftRail = BuildLeft(); rightRail = BuildRight(); workspace.Children.Add(leftRail); Grid.SetColumn(rightRail, 2); workspace.Children.Add(rightRail);
-        var editorHost = new Border { BorderBrush = Brush("#B8C2CC"), BorderThickness = new(1), Child = graph, Background = Brush("#FFFFFF") }; Grid.SetColumn(editorHost, 1); workspace.Children.Add(editorHost); Grid.SetRow(workspace, 2); root.Children.Add(workspace);
+        var editorArea = new Grid(); editorArea.Children.Add(graph); editorArea.Children.Add(search);
+        var editorHost = new Border { BorderBrush = Brush("#B8C2CC"), BorderThickness = new(1), Child = editorArea, Background = Brush("#FFFFFF") }; Grid.SetColumn(editorHost, 1); workspace.Children.Add(editorHost); Grid.SetRow(workspace, 2); root.Children.Add(workspace);
         var footer = new Grid { Background = Brush("#E7ECF2"), Padding = new(10, 0, 10, 0) };
         footer.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         footer.Children.Add(status); modeText.Margin = new(18, 0, 18, 0); Grid.SetColumn(modeText, 1); footer.Children.Add(modeText); Grid.SetColumn(counts, 2); footer.Children.Add(counts); Grid.SetRow(footer, 3); root.Children.Add(footer); Content = root;
@@ -60,7 +62,7 @@ public sealed partial class WorkbenchPage : Page
             workspace.ColumnDefinitions[2].Width = new(narrow ? 0 : 280); rightRail.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
         };
         samples.SelectionChanged += async (_, _) => { if (samples.SelectedItem is string name && name != currentName) { if (await ConfirmDiscard()) LoadExample(name); else samples.SelectedItem = currentName; } };
-        Unloaded += (_, _) => { diagnosticTimer?.Stop(); layoutCancellation?.Cancel(); inspector.Dispose(); overview.Dispose(); graph.Dispose(); };
+        Unloaded += (_, _) => { diagnosticTimer?.Stop(); layoutCancellation?.Cancel(); search.Dispose(); inspector.Dispose(); overview.Dispose(); graph.Dispose(); };
         UpdateStatus();
     }
     private void Run(Action action) { try { action(); PublishTestState(); } catch (Exception ex) { Report(ex.Message); } }
