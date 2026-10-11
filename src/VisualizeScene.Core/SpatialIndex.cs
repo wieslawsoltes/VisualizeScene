@@ -5,16 +5,16 @@ public readonly record struct SpatialQueryStatistics(int VisitedBranches, int Ex
 /// <summary>Immutable packed bounding-volume hierarchy. Build uses bounded median partitioning, not a full sort at every level.</summary>
 public sealed class SpatialIndex<T>
 {
-    private readonly record struct Entry(RectD Bounds, T Item);
+    private readonly record struct Entry(RectD Bounds, T Item, double CenterX, double CenterY);
     private readonly record struct Branch(RectD Bounds, int Left, int Right, int Start, int Count);
     private readonly Entry[] entries;
     private readonly Branch[] branches;
-    private static readonly IComparer<Entry> xComparer = Comparer<Entry>.Create(static (a, b) => a.Bounds.Center.X.CompareTo(b.Bounds.Center.X));
-    private static readonly IComparer<Entry> yComparer = Comparer<Entry>.Create(static (a, b) => a.Bounds.Center.Y.CompareTo(b.Bounds.Center.Y));
+    private static readonly IComparer<Entry> xComparer = Comparer<Entry>.Create(static (a, b) => a.CenterX.CompareTo(b.CenterX));
+    private static readonly IComparer<Entry> yComparer = Comparer<Entry>.Create(static (a, b) => a.CenterY.CompareTo(b.CenterY));
     public SpatialIndex(IEnumerable<(RectD Bounds, T Item)> values)
     {
         ArgumentNullException.ThrowIfNull(values);
-        entries = values.Select(v => new Entry(v.Bounds, v.Item)).ToArray();
+        entries = values.Select(v => new Entry(v.Bounds, v.Item, v.Bounds.X + v.Bounds.Width / 2, v.Bounds.Y + v.Bounds.Height / 2)).ToArray();
         foreach (var entry in entries)
             if (!entry.Bounds.IsValid || !double.IsFinite(entry.Bounds.Right) || !double.IsFinite(entry.Bounds.Bottom))
                 throw new ArgumentException("Invalid index bounds.", nameof(values));
@@ -36,7 +36,7 @@ public sealed class SpatialIndex<T>
     }
     private void Partition(int left, int right, int median, bool horizontal)
     {
-        static double Coordinate(Entry entry, bool x) => x ? entry.Bounds.Center.X : entry.Bounds.Center.Y;
+        static double Coordinate(in Entry entry, bool x) => x ? entry.CenterX : entry.CenterY;
         var budget = 2 * (System.Numerics.BitOperations.Log2((uint)(right - left + 1)) + 1);
         while (left < right)
         {
@@ -48,8 +48,8 @@ public sealed class SpatialIndex<T>
             while (i <= upper)
             {
                 var value = Coordinate(entries[i], horizontal);
-                if (value < pivot) { (entries[i], entries[lower]) = (entries[lower], entries[i]); i++; lower++; }
-                else if (value > pivot) { (entries[i], entries[upper]) = (entries[upper], entries[i]); upper--; }
+                if (value < pivot) { if (i != lower) (entries[i], entries[lower]) = (entries[lower], entries[i]); i++; lower++; }
+                else if (value > pivot) { if (i != upper) (entries[i], entries[upper]) = (entries[upper], entries[i]); upper--; }
                 else i++;
             }
             if (median < lower) right = lower - 1;
