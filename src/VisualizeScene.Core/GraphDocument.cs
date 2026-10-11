@@ -72,24 +72,25 @@ public sealed class GraphDocument
 /// <summary>An isolated mutable transaction; validation and publication happen atomically in GraphDocument.</summary>
 public sealed class GraphEdit
 {
-    private readonly Dictionary<string, GraphNode> nodes;
-    private readonly Dictionary<string, GraphEdge> edges;
-    private readonly Dictionary<string, GraphPort> ports;
-    private readonly Dictionary<string, GraphLabel> labels;
-    public IEnumerable<GraphNode> Nodes => nodes.Values;
-    public IEnumerable<GraphEdge> Edges => edges.Values;
-    public GraphEdit(GraphSnapshot snapshot)
-    {
-        nodes = snapshot.Nodes.ToDictionary(n => n.Id); edges = snapshot.Edges.ToDictionary(e => e.Id);
-        ports = snapshot.Ports.ToDictionary(p => p.Id); labels = snapshot.Labels.ToDictionary(l => l.Id);
-    }
+    private readonly GraphSnapshot original;
+    private Dictionary<string, GraphNode>? nodeEdits;
+    private Dictionary<string, GraphEdge>? edgeEdits;
+    private Dictionary<string, GraphPort>? portEdits;
+    private Dictionary<string, GraphLabel>? labelEdits;
+    private Dictionary<string, GraphNode> nodes => nodeEdits ??= original.Nodes.ToDictionary(n => n.Id);
+    private Dictionary<string, GraphEdge> edges => edgeEdits ??= original.Edges.ToDictionary(e => e.Id);
+    private Dictionary<string, GraphPort> ports => portEdits ??= original.Ports.ToDictionary(p => p.Id);
+    private Dictionary<string, GraphLabel> labels => labelEdits ??= original.Labels.ToDictionary(l => l.Id);
+    public IEnumerable<GraphNode> Nodes => nodeEdits is null ? original.Nodes : nodeEdits.Values;
+    public IEnumerable<GraphEdge> Edges => edgeEdits is null ? original.Edges : edgeEdits.Values;
+    public GraphEdit(GraphSnapshot snapshot) => original = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
     public static string NewId(string prefix = "n") => prefix + Guid.NewGuid().ToString("N");
     public void Add(GraphNode node) => nodes.Add(node.Id, node);
     public void Add(GraphEdge edge) => edges.Add(edge.Id, edge);
     public void Add(GraphPort port) => ports.Add(port.Id, port);
     public void Add(GraphLabel label) => labels.Add(label.Id, label);
-    public GraphNode Node(string id) => nodes[id];
-    public GraphEdge Edge(string id) => edges[id];
+    public GraphNode Node(string id) => nodeEdits is null ? original.Index().Nodes[id] : nodeEdits[id];
+    public GraphEdge Edge(string id) => edgeEdits is null ? original.Index().Edges[id] : edgeEdits[id];
     public void Update(GraphNode node) { if (!nodes.ContainsKey(node.Id)) throw new KeyNotFoundException(node.Id); nodes[node.Id] = node; }
     public void Update(GraphEdge edge) { if (!edges.ContainsKey(edge.Id)) throw new KeyNotFoundException(edge.Id); edges[edge.Id] = edge; }
     public void Update(GraphPort port) { if (!ports.ContainsKey(port.Id)) throw new KeyNotFoundException(port.Id); ports[port.Id] = port; }
@@ -111,12 +112,14 @@ public sealed class GraphEdit
     }
     public void Move(IEnumerable<string> ids, PointD delta)
     {
+        if (!delta.IsFinite) throw new ArgumentException("Movement must be finite.", nameof(delta));
         var selected = ids.Where(nodes.ContainsKey).ToHashSet();
+        if (selected.Count == 0 || delta == default) return;
         var children = nodes.Values.Where(n => n.ParentId is not null).ToLookup(n => n.ParentId!);
         var queue = new Queue<string>(selected);
         while (queue.TryDequeue(out var id)) foreach (var child in children[id]) if (selected.Add(child.Id)) queue.Enqueue(child.Id);
         foreach (var id in selected) { var n = nodes[id]; if (!n.Locked) nodes[id] = n with { Bounds = n.Bounds.Move(delta) }; }
-        foreach (var e in edges.Values.ToArray())
+        foreach (var e in Edges.ToArray())
             if (selected.Contains(e.SourceId) && selected.Contains(e.TargetId) && !nodes[e.SourceId].Locked && !nodes[e.TargetId].Locked && !e.Bends.IsDefaultOrEmpty)
                 edges[e.Id] = e with { Bends = e.Bends.Select(p => p + delta).ToImmutableArray() };
     }
@@ -138,5 +141,10 @@ public sealed class GraphEdit
         foreach (var child in nodes.Values.Where(n => n.ParentId == id).ToArray()) nodes[child.Id] = child with { ParentId = group.ParentId };
         Remove(id);
     }
-    public GraphSnapshot Build() => new(nodes.Values.ToImmutableArray(), edges.Values.ToImmutableArray(), ports.Values.ToImmutableArray(), labels.Values.ToImmutableArray());
+    /// <summary>Untouched collections retain their immutable arrays, enabling downstream index and picture reuse.</summary>
+    public GraphSnapshot Build() => nodeEdits is null && edgeEdits is null && portEdits is null && labelEdits is null ? original :
+        new(nodeEdits is null ? original.Nodes : nodeEdits.Values.ToImmutableArray(),
+            edgeEdits is null ? original.Edges : edgeEdits.Values.ToImmutableArray(),
+            portEdits is null ? original.Ports : portEdits.Values.ToImmutableArray(),
+            labelEdits is null ? original.Labels : labelEdits.Values.ToImmutableArray());
 }

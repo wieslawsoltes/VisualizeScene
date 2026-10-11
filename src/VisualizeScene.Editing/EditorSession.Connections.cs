@@ -17,13 +17,23 @@ public sealed partial class EditorSession
     /// <summary>Finds explicit ports before node interiors. Folded child endpoints are never candidates.</summary>
     public ConnectionEnd? FindConnectionCandidate(PointD world)
     {
-        var tolerance = 9 / Viewport.Zoom;
-        var port = Document.Snapshot.Ports.Where(p => index.IsVisible(p.NodeId))
-            .Select(p => (Port: p, Distance: PointD.Distance(index.PortLocation(p.Id), world)))
-            .Where(p => p.Distance <= tolerance).OrderBy(p => p.Distance).FirstOrDefault();
-        if (port.Port is not null) return new(port.Port.NodeId, port.Port.Id);
-        var hit = Document.Snapshot.Nodes.Reverse().FirstOrDefault(n => index.IsVisible(n.Id) && Geometry.HitNode(n, world) &&
-            (!n.IsGroup || n.Collapsed || world.Y <= n.Bounds.Y + 25 || world.X <= n.Bounds.X + 6 || world.X >= n.Bounds.Right - 6 || world.Y >= n.Bounds.Bottom - 6));
+        var tolerance = 9 / Viewport.Zoom; QueryHitCandidates(world, tolerance);
+        string? best = null; var distance = double.PositiveInfinity; var order = int.MaxValue;
+        foreach (var id in hitPorts)
+        {
+            var d = PointD.Distance(index.PortLocation(id), world);
+            if (d <= tolerance && (d < distance || d == distance && portOrder[id] < order))
+            { best = id; distance = d; order = portOrder[id]; }
+        }
+        if (best is not null) return new(index.Ports[best].NodeId, best);
+        GraphNode? hit = null; var top = -1;
+        foreach (var id in hitNodes)
+        {
+            var n = index.Nodes[id];
+            if (nodeOrder[id] > top && Geometry.HitNode(n, world) &&
+                (!n.IsGroup || n.Collapsed || world.Y <= n.Bounds.Y + 25 || world.X <= n.Bounds.X + 6 || world.X >= n.Bounds.Right - 6 || world.Y >= n.Bounds.Bottom - 6))
+            { hit = n; top = nodeOrder[id]; }
+        }
         return hit is null ? null : new(hit.Id);
     }
 

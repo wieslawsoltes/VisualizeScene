@@ -68,7 +68,9 @@ public sealed partial class EditorSession
         .Select(p => { var point = index.PortLocation(p.Id); return (new RectD(point.X, point.Y, 0, 0), p.Id); }));
     private void PublishSelection()
     {
-        readSelection = new(selection); SelectionChanged?.Invoke(this, EventArgs.Empty); Invalidate();
+        readSelection = new(selection);
+        if (selection.Count == 1) FocusItem(selection.First());
+        SelectionChanged?.Invoke(this, EventArgs.Empty); Invalidate();
     }
 
     /// <summary>Materializes inputs before mutation. Duplicates toggle only once; unknown and hidden items are ignored.</summary>

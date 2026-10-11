@@ -55,7 +55,7 @@ public sealed partial class EditorSession : IDisposable
     public void Dispose() => Document.Changed -= DocumentChanged;
     private void DocumentChanged(object? sender, GraphChangedEventArgs args)
     {
-        CancelGesture(false); Reindex();
+        CancelGesture(false); Reindex(); RefreshNavigation();
         var changed = selection.RemoveWhere(id => !IsSelectable(id)) > 0;
         if (changed) PublishSelection();
         StatusChanged?.Invoke(this, args.Operation); Invalidate();
@@ -66,7 +66,7 @@ public sealed partial class EditorSession : IDisposable
         nodeIndex = new(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => (n.Bounds, n.Id)));
         paths = Document.Snapshot.Edges.Where(e => GraphScene.IsEdgeVisible(index, e)).ToDictionary(e => e.Id, index.EdgePath);
         edgeIndex = new(paths.Select(p => (RectD.Enclose(p.Value.Select(v => new RectD(v.X, v.Y, 0, 0))).Inflate(1), p.Key)));
-        ReindexLabels(); ReindexSelection(); itemSnaps = new(Document.Snapshot);
+        ReindexLabels(); ReindexSelection(); ReindexHitOrder(); itemSnaps = new(Document.Snapshot);
     }
     public void Invalidate() => Invalidated?.Invoke(this, EventArgs.Empty);
     public void Select(IEnumerable<string> ids, bool additive = false)
@@ -79,6 +79,7 @@ public sealed partial class EditorSession : IDisposable
     }
     public HitResult Hit(PointD world, bool handles = true)
     {
+        LastHitStatistics = default;
         var tolerance = 7 / Viewport.Zoom;
         if (handles)
         {
@@ -98,23 +99,17 @@ public sealed partial class EditorSession : IDisposable
                 }
             }
         }
-        foreach (var p in Document.Snapshot.Ports) if (index.IsVisible(p.NodeId) && PointD.Distance(world, index.PortLocation(p.Id)) < tolerance) return new(HitKind.Port, p.Id);
-        if (Viewport.Zoom >= .25)
-        {
-            var labels = labelIndex.Query(new RectD(world.X, world.Y, 0, 0)).ToHashSet();
-            var label = Document.Snapshot.Labels.LastOrDefault(l => labels.Contains(l.Id));
-            if (label is not null) return new(HitKind.Label, label.Id);
-        }
-        var candidates = nodeIndex.Query(new(world.X, world.Y, 0, 0)).ToHashSet();
-        var hitNodes = Document.Snapshot.Nodes.Where(n => candidates.Contains(n.Id) && Geometry.HitNode(n, world)).Reverse().ToArray();
-        var normal = hitNodes.FirstOrDefault(n => !n.IsGroup || n.Collapsed);
-        if (normal is not null) return new(HitKind.Node, normal.Id);
-        foreach (var id in edgeIndex.Query(new RectD(world.X, world.Y, 0, 0).Inflate(tolerance)))
+        QueryHitCandidates(world, tolerance);
+        var port = HitPort(world, tolerance); if (port is not null) return new(HitKind.Port, port);
+        var label = HitLabel(); if (label is not null) return new(HitKind.Label, label);
+        var normal = HitNode(world, groupOnly: false); if (normal is not null) return new(HitKind.Node, normal.Id);
+        foreach (var id in hitEdges)
         {
             var points = paths[id];
-            for (var i = 1; i < points.Count; i++) if (Geometry.DistanceToSegment(world, points[i - 1], points[i]) <= tolerance) return new(HitKind.Edge, id);
+            for (var i = 1; i < points.Count; i++)
+                if (Geometry.DistanceToSegment(world, points[i - 1], points[i]) <= tolerance) return new(HitKind.Edge, id);
         }
-        var group = hitNodes.FirstOrDefault(n => world.Y < n.Bounds.Y + 25 || world.X < n.Bounds.X + 6 || world.X > n.Bounds.Right - 6 || world.Y > n.Bounds.Bottom - 6);
+        var group = HitNode(world, groupOnly: true);
         return group is null ? new(HitKind.None) : new(HitKind.Node, group.Id);
     }
     public string AddNode(PointD center)
