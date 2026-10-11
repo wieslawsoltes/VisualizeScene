@@ -64,8 +64,11 @@ with sync_playwright() as p:
     def node_point(ident):
         s=state(); b=next(n["Bounds"] for n in s["model"]["Graph"]["Nodes"] if n["Id"]==ident)
         return s["canvas"]["x"]+(b["X"]+b["Width"]/2-s["origin"]["x"])*s["zoom"], s["canvas"]["y"]+(b["Y"]+b["Height"]/2-s["origin"]["y"])*s["zoom"]
-    def record(name):
-        assert not state()["error"], state()["error"]
+    def record(name, expected_error=None):
+        if expected_error is None:
+            assert not state()["error"], state()["error"]
+        else:
+            assert expected_error in state()["error"], state()["error"]
         assert not state()["search"]["error"], state()["search"]["error"]
         results.append({"name": name, "passed": True})
         print("PASS", name, flush=True)
@@ -142,6 +145,19 @@ with sync_playwright() as p:
         find("Beta",1); page.screenshot(path=str(out/"narrow-search.png"))
         b=state()["controls"]["SearchQuery"]; assert b["x"]>=0 and b["x"]+b["width"]<=640
         record("Search remains usable with the workbench side rails collapsed")
+        click("SearchClose"); click("Fit")
+        with page.expect_file_chooser() as pending: click("Open")
+        # Chromium intercepts its native picker; keep the real Uno picker task pending,
+        # then edit through actual graph input before returning the chosen file.
+        page.mouse.click(*node_point("a"))
+        before_edit = state()["revision"]
+        page.keyboard.press("ArrowRight")
+        wait(f"v.revision === {before_edit+1}")
+        edited_model = state()["model"]
+        pending.value.set_files(str(empty))
+        wait("v.error.includes('graph changed while the file picker was open')")
+        assert state()["revision"] == before_edit+1 and state()["model"] == edited_model
+        record("A pending real upload task cannot overwrite subsequent graph edits", "graph changed while the file picker was open")
         assert not errors,errors
     except Exception as error:
         traceback.print_exc(); errors.append(str(error))
