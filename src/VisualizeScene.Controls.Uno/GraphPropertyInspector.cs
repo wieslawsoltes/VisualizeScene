@@ -7,7 +7,7 @@ using VisualizeScene.Core;
 namespace VisualizeScene.Controls.Uno;
 
 /// <summary>Compact property grid. All item changes use a captured document/revision lease and one validated edit.</summary>
-public sealed class GraphPropertyInspector : UserControl, IDisposable
+public sealed partial class GraphPropertyInspector : UserControl, IDisposable
 {
     private readonly EditorPropertyGrid fields = new();
     private readonly StackPanel commands = new() { Spacing = 5 };
@@ -20,6 +20,10 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     private GraphDocument? inspectedDocument;
     private long inspectedRevision;
     private bool disposed;
+    private VisualizeScene.Editing.GraphPropertySelection? batchSummary;
+    private IReadOnlySet<string>? inspectedSelection;
+    public int BatchItemCount => batchSummary?.ItemIds.Length ?? 0;
+    public int BatchExaminedItems => batchSummary?.ExaminedItems ?? 0;
     public string MessageText => message.Text;
     public int PropertyCount => fields.PropertyCount;
     public bool IsPropertyGroupExpanded(string name) => fields.IsGroupExpanded(name);
@@ -73,17 +77,17 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     private CheckBox Check(string name, string label, bool value)
     {
         var input = new CheckBox { IsChecked = value, MinHeight = 26, Padding = new(3, 0, 0, 0) };
-        Register(name, input); fields.AddProperty(label, input); return input;
+        Register(name, input); fields.AddProperty(name, input); return input;
     }
     public void Refresh()
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        fields.Clear(); commands.Children.Clear(); editors.Clear(); colors.Clear(); message.Text = ""; identity.Text = "";
-        inspectedDocument = target?.Document; inspectedRevision = inspectedDocument?.Revision ?? 0;
+        fields.Clear(); commands.Children.Clear(); editors.Clear(); colors.Clear(); message.Text = ""; identity.Text = ""; batchSummary = null;
+        inspectedDocument = target?.Document; inspectedRevision = inspectedDocument?.Revision ?? 0; inspectedSelection = target?.Session.Selection;
         if (target is null || target.Session.Selection.Count == 0)
         { title.Text = "Nothing selected"; message.Text = "Select a node, edge, port or label. Property changes are applied together and can be undone."; return; }
         if (target.Session.Selection.Count > 1)
-        { title.Text = $"{target.Session.Selection.Count:N0} items selected"; message.Text = "Use the Arrange and Selection commands for multiple items."; return; }
+        { BuildBatch(); return; }
         var index = target.Document.Snapshot.Index(); var id = target.Session.Selection.First(); identity.Text = "ID: " + id; ToolTipService.SetToolTip(identity, id);
         if (index.Nodes.TryGetValue(id, out var node))
         {
@@ -133,17 +137,17 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
         }
     }
     private void Apply(Action action) => Command("Apply", "Apply properties", action);
-    private Button Command(string name, string text, Action action)
+    private Button Command(string name, string text, Action action, bool reportApplied = true)
     {
         var button = new Button { Content = text, FontSize = 12, MinHeight = 28, Padding = new(5, 3, 5, 3), HorizontalAlignment = HorizontalAlignment.Stretch };
-        Register(name, button); var document = inspectedDocument; var revision = inspectedRevision;
+        Register(name, button); var document = inspectedDocument; var revision = inspectedRevision; var selection = inspectedSelection;
         button.Click += (_, _) =>
         {
             try
             {
-                if (disposed || target?.Document != document || document?.Revision != revision)
+                if (disposed || target?.Document != document || document?.Revision != revision || !ReferenceEquals(selection, target?.Session.Selection))
                     throw new InvalidOperationException("The graph changed; review the current properties before applying.");
-                action(); message.Text = "Properties applied.";
+                action(); if (reportApplied) message.Text = "Properties applied.";
             }
             catch (Exception ex) { message.Text = ex.Message; }
         };
@@ -158,6 +162,6 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     }
     public new void Dispose()
     {
-        if (disposed) return; Detach(); disposed = true; target = null; inspectedDocument = null; fields.Clear(); commands.Children.Clear(); editors.Clear(); colors.Clear();
+        if (disposed) return; Detach(); disposed = true; target = null; inspectedDocument = null; inspectedSelection = null; batchSummary = null; fields.Clear(); commands.Children.Clear(); editors.Clear(); colors.Clear();
     }
 }

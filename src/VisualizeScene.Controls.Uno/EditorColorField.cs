@@ -14,6 +14,8 @@ public sealed class EditorColorField : UserControl
     private readonly Button preview = new() { Width = 26, MinWidth = 0, MinHeight = 26, Padding = new(3), BorderThickness = new(1), CornerRadius = new(0) };
     private readonly Dictionary<string, Button> swatches = new(StringComparer.OrdinalIgnoreCase);
     private Flyout? flyout;
+    private bool mixed;
+    public bool IsMixed { get => mixed; set { mixed = value; UpdatePreview(); } }
     public TextBox Input => input;
     public Button PaletteButton => preview;
     public string Value { get => input.Text; set => input.Text = value; }
@@ -25,15 +27,15 @@ public sealed class EditorColorField : UserControl
         var row = new Grid(); row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         row.Children.Add(input); Grid.SetColumn(preview, 1); row.Children.Add(preview); Content = row;
         AutomationProperties.SetName(preview, "Choose color"); ToolTipService.SetToolTip(preview, "Choose a color; Apply properties commits it");
-        input.TextChanged += (_, _) => { UpdatePreview(); ValueChanged?.Invoke(this, EventArgs.Empty); };
+        input.TextChanged += (_, _) => { if (input.Text.Length > 0) mixed = false; UpdatePreview(); ValueChanged?.Invoke(this, EventArgs.Empty); };
         preview.Click += (_, _) => { EnsurePalette(); flyout!.ShowAt(preview); };
         Value = "#FFFFFF";
     }
     private void UpdatePreview()
     {
         preview.Background = IsValid ? NodePalette.Brush(Value) : new SolidColorBrush(Microsoft.UI.Colors.LightGray);
-        preview.Content = IsValid ? "" : "?";
-        AutomationProperties.SetName(preview, IsValid ? "Choose color, current " + Value : "Choose color, invalid color text");
+        preview.Content = mixed ? "—" : IsValid ? "" : "?";
+        AutomationProperties.SetName(preview, mixed ? "Choose color, multiple colors" : IsValid ? "Choose color, current " + Value : "Choose color, invalid color text");
     }
     private void EnsurePalette()
     {
