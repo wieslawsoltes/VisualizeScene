@@ -23,8 +23,14 @@ public sealed partial class WorkbenchPage
             }
             catch { return "null"; }
         }
+        foreach (var name in new[] { "Label", "Text", "X", "Y", "Width", "Height", "Shape", "Fill", "Stroke", "FillPalette", "StrokePalette", "FillSwatchFFCC66", "FillSwatchDDEFE3", "OffsetX", "OffsetY", "FontSize", "RelativeX", "RelativeY", "Locked", "GroupGeometry", "GroupAppearance", "Apply" })
+        {
+            var key = "Property" + name;
+            if (inspector.FindPropertyEditor(name) is { } editor) testControls[key] = editor; else testControls.Remove(key);
+        }
+        var inspectorState = $"{{count:{inspector.PropertyCount},geometryExpanded:{(inspector.IsPropertyGroupExpanded("Geometry") ? "true" : "false")},message:{Q(inspector.MessageText)}}}";
         var commands = string.Join(",", testControls.Where(p => p.Value is Control).Select(p => Q(p.Key) + ":" + (((Control)p.Value).IsEnabled ? "true" : "false")));
-        var state = $"{{leftWidth:{N(workspace.LeftPaneWidth)},rightWidth:{N(workspace.RightPaneWidth)},leftVisible:{(workspace.IsLeftPaneVisible ? "true" : "false")},rightVisible:{(workspace.IsRightPaneVisible ? "true" : "false")},leftCollapsed:{(palettePane?.IsCollapsed == true ? "true" : "false")},overviewCollapsed:{(overviewPane?.IsCollapsed == true ? "true" : "false")},leftTab:{Q(structure.IsLoaded ? "Structure" : "Palette")},documentTitle:{Q(documentCaption.Text)},enabled:{{{commands}}},structure:{{rows:{structure.VisibleRowCount},builds:{structure.IndexBuilds},selected:{(structure.SelectedId is { } id ? Q(id) : "null")},bounds:{Bounds(structure.ItemsControl)}}},overview:{{recordings:{overview.Statistics.SceneRecordings},frames:{overview.Statistics.Frames},bounds:{Bounds(overview)}}}}}";
+        var state = $"{{modeCaption:{Q(modeText.Text)},inspector:{inspectorState},leftWidth:{N(workspace.LeftPaneWidth)},rightWidth:{N(workspace.RightPaneWidth)},leftVisible:{(workspace.IsLeftPaneVisible ? "true" : "false")},rightVisible:{(workspace.IsRightPaneVisible ? "true" : "false")},leftCollapsed:{(palettePane?.IsCollapsed == true ? "true" : "false")},overviewCollapsed:{(overviewPane?.IsCollapsed == true ? "true" : "false")},leftTab:{Q(structure.IsLoaded ? "Structure" : "Palette")},documentTitle:{Q(documentCaption.Text)},enabled:{{{commands}}},structure:{{rows:{structure.VisibleRowCount},builds:{structure.IndexBuilds},selected:{(structure.SelectedId is { } id ? Q(id) : "null")},bounds:{Bounds(structure.ItemsControl)}}},overview:{{recordings:{overview.Statistics.SceneRecordings},frames:{overview.Statistics.Frames},bounds:{Bounds(overview)}}}}}";
         Uno.Foundation.WebAssemblyRuntime.InvokeJS("globalThis.visualizeSceneWorkspace=" + state + ";");
 #endif
     }

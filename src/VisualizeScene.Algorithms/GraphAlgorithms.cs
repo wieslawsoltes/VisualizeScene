@@ -8,7 +8,7 @@ public sealed record GraphPath(IReadOnlyList<string> Nodes, IReadOnlyList<string
 }
 public sealed record FlowResult(double Value, IReadOnlyDictionary<string, double> EdgeFlows, IReadOnlySet<string> SourcePartition);
 
-public static class GraphAlgorithms
+public static partial class GraphAlgorithms
 {
     private sealed record Arc(string To, GraphEdge Edge);
     private static Dictionary<string, List<Arc>> Adjacency(GraphSnapshot graph, bool undirected = false, bool reverse = false)
@@ -160,24 +160,6 @@ public static class GraphAlgorithms
         }
         return result;
     }
-    public static IReadOnlyDictionary<string, double> PageRank(GraphSnapshot graph, double damping = .85, int iterations = 200, double tolerance = 1e-10, CancellationToken cancellationToken = default)
-    {
-        if (!double.IsFinite(damping) || !double.IsFinite(tolerance) || damping < 0 || damping >= 1 || iterations < 1 || tolerance <= 0) throw new ArgumentOutOfRangeException(nameof(damping));
-        var adjacency = Adjacency(graph); var n = graph.Nodes.Length;
-        var rank = graph.Nodes.ToDictionary(x => x.Id, _ => n == 0 ? 0 : 1d / n);
-        if (n == 0) return rank;
-        for (var iteration = 0; iteration < iterations; iteration++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var dangling = rank.Where(pair => adjacency[pair.Key].Count == 0).Sum(pair => pair.Value);
-            var next = graph.Nodes.ToDictionary(x => x.Id, _ => (1 - damping + damping * dangling) / n);
-            foreach (var (id, arcs) in adjacency)
-                if (arcs.Count > 0) foreach (var arc in arcs) next[arc.To] += damping * rank[id] / arcs.Count;
-            var error = next.Sum(pair => Math.Abs(pair.Value - rank[pair.Key])); rank = next;
-            if (error <= tolerance) break;
-        }
-        return rank;
-    }
     /// <summary>Brandes unweighted betweenness. Parallel edges count as distinct shortest paths.</summary>
     public static IReadOnlyDictionary<string, double> Betweenness(GraphSnapshot graph, bool undirected = false, CancellationToken cancellationToken = default)
     {
@@ -222,39 +204,5 @@ public static class GraphAlgorithms
             var color = 0; while (used.Contains(color)) color++; colors[id] = color;
         }
         return colors;
-    }
-    private sealed class ResidualArc(string to, double capacity)
-    {
-        public string To = to;
-        public double Capacity = capacity;
-        public ResidualArc Reverse = null!;
-    }
-    public static FlowResult MaximumFlow(GraphSnapshot graph, string source, string sink, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested(); GraphValidation.Validate(graph);
-        if (source == sink || graph.Edges.Any(e => !e.Directed || e.Weight < 0 || !double.IsFinite(e.Weight))) throw new ArgumentException("Flow requires distinct terminals, directed edges and finite nonnegative capacities.");
-        var residual = graph.Nodes.ToDictionary(n => n.Id, _ => new List<ResidualArc>());
-        if (!residual.ContainsKey(source) || !residual.ContainsKey(sink)) throw new ArgumentException("Unknown terminal.");
-        var forward = new Dictionary<string, ResidualArc>();
-        foreach (var e in graph.Edges)
-        {
-            var a = new ResidualArc(e.TargetId, e.Weight); var b = new ResidualArc(e.SourceId, 0); a.Reverse = b; b.Reverse = a;
-            residual[e.SourceId].Add(a); residual[e.TargetId].Add(b); forward[e.Id] = a;
-        }
-        double flow = 0; HashSet<string> seen;
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            seen = [source]; var previous = new Dictionary<string, (string From, ResidualArc Arc)>(); var queue = new Queue<string>(); queue.Enqueue(source);
-            while (queue.TryDequeue(out var id) && !seen.Contains(sink))
-                foreach (var arc in residual[id]) if (arc.Capacity > 0 && seen.Add(arc.To)) { previous[arc.To] = (id, arc); queue.Enqueue(arc.To); }
-            if (!seen.Contains(sink)) break;
-            var amount = double.PositiveInfinity;
-            for (var id = sink; id != source; id = previous[id].From) amount = Math.Min(amount, previous[id].Arc.Capacity);
-            for (var id = sink; id != source; id = previous[id].From) { var arc = previous[id].Arc; arc.Capacity -= amount; arc.Reverse.Capacity += amount; }
-            flow += amount;
-            if (!double.IsFinite(flow)) throw new OverflowException("The flow exceeds the finite double range.");
-        }
-        return new(flow, graph.Edges.ToDictionary(e => e.Id, e => e.Weight - forward[e.Id].Capacity), seen);
     }
 }

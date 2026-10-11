@@ -116,7 +116,7 @@ interaction require independent testing; compilation is not execution evidence.
 ## Same-runner comparison
 
 Navigation and performance checks out pinned baseline main
-`36154e0f5bcfea41a2d0f42889b3d27fc86dc438` (PR #3) and the current revision. The same
+`3e674fe8a27e5495abb06ab50f36cb77df7862b6` (PR #6) and the current revision. The same
 benchmark source is copied into two isolated project directories referencing each
 revision, with the same .NET/native dependencies. Tiered compilation is disabled.
 Build and restore time is excluded. Both versions receive a full managed collection
@@ -124,7 +124,7 @@ after warm-up and before each measured workload, isolating garbage from precedin
 
 The primary fixture contains 10,000 nodes, 9,900 short local edges, 10,000 relative
 ports and 10,000 independent labels. The raster viewport is 800 x 400 at zoom 1.
-Operations cover spatial build/query, warm index/validation, local hit/connection rules,
+Operations cover PageRank (80 maximum iterations, tolerance 1e-20), spatial build/query, warm index/validation, local hit/connection rules,
 selected handles/rendering, label edit/build, node drag preview, warm and cold rendering,
 new-snapshot indexing, 10,000-node grid layout, and deletion of 1,000 nodes. Deletion
 includes temporary document/editor construction. Cold render includes construction,
@@ -142,3 +142,11 @@ These are CPU/raster and managed-allocation measurements, not presentation FPS, 
 GPU throughput, input latency, energy use or touchscreen certification. Uno chooses the
 interactive rendering backend. One fixture cannot establish performance for every graph
 density, label length, zoom level or layout workload.
+
+## Numeric and property-editor follow-up
+
+[Property editing and numeric review](property-grid-and-numeric-review.md) documents
+reused PageRank rank/adjacency storage, max-flow scratch storage and stable reporting
+of small net flows through large-capacity edges. It also covers constant-time saved-state
+checks and lazily allocated property color palettes. Numeric oracles, allocation tests
+and actual property-editor interactions accompany these optimizations.

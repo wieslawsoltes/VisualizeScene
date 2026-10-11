@@ -20,7 +20,7 @@ public sealed partial class WorkbenchPage
         if (document.Revision != revision) throw new InvalidOperationException("The graph changed while the file picker was open. Open the file again to replace the current graph.");
         if (!await ConfirmDiscard()) return;
         if (request != fileRequest) return;
-        Import(text, revision); currentName = file.Name; dirty = false;
+        Import(text, revision); currentName = file.Name; savePoint.MarkSaved();
     }
     private void Import(string text, long? expectedRevision = null)
     {
@@ -42,7 +42,7 @@ public sealed partial class WorkbenchPage
             var file = await picker.PickSaveFileAsync(); if (file is null) return; await FileIO.WriteBytesAsync(file, bytes);
 #endif
             var stillCurrent = revision == document.Revision;
-            if (stillCurrent && extension is ("json" or "graphml")) dirty = false;
+            if (extension is ("json" or "graphml")) savePoint.MarkSaved(snapshot);
             status.Text = "Saved " + name + (stillCurrent ? "" : " (earlier revision; current changes remain unsaved).");
         });
     }

@@ -8,6 +8,7 @@ using VisualizeScene.Core;
 using VisualizeScene.Editing;
 using VisualizeScene.Rendering.Skia;
 using VisualizeScene.Layout;
+using VisualizeScene.Algorithms;
 
 // Deliberately uses only pre-PR3 public APIs so the identical harness builds against both revisions.
 if (args.Length != 2) throw new ArgumentException("Usage: benchmark output.json revision");
@@ -44,6 +45,7 @@ var spatialItems = nodes.Select(n => (n.Bounds, n.Id)).ToArray();
 Measure("spatial_build_10000", () => sink = new SpatialIndex<string>(spatialItems));
 var spatial = new SpatialIndex<string>(spatialItems); var candidates = new List<string>(64);
 Measure("spatial_query_warm", () => { candidates.Clear(); _ = spatial.Query(new RectD(0, 0, 800, 400), candidates); }, batch: 100);
+Measure("pagerank_10000", () => sink = GraphAlgorithms.PageRank(graph, iterations: 80, tolerance: 1e-20), samples: 20);
 Measure("snapshot_index_warm", () => sink = graph.Index(), batch: 5);
 Measure("snapshot_validation_warm", () => GraphValidation.Validate(graph), batch: 5);
 Measure("hit_test_local", () => sink = editor.Hit(new(50, 30), handles: false), batch: 10);
