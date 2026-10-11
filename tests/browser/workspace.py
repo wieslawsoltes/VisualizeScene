@@ -60,6 +60,11 @@ with sync_playwright() as p:
         wait(f'v.revision==={revision+1} && v.model.Graph.Nodes.length===11 && w.enabled.Undo')
         added=state()['model']['Graph']['Nodes'][-1];assert added['Shape']=='Diamond' and added['Fill']=='#FFCC66'
         assert ws()['documentTitle'].endswith('*')
+        with page.expect_download() as download: click('Save')
+        download.value.save_as(str(out/'palette-created.json'))
+        wait("!w.documentTitle.endsWith('*')")
+        assert state()['revision']==revision+1
+        record('Saving clears the document header marker without another graph edit')
         click('Undo');wait('v.model.Graph.Nodes.length===10 && w.enabled.Redo')
         assert state()['model']==before
         record('Categorized amber tile palette creates the selected shape with exact undo')

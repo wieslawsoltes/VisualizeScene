@@ -19,10 +19,10 @@ public sealed class EditorWorkspace : Grid
     public UIElement? LeftContent { get => left.Content as UIElement; set => left.Content = value; }
     public UIElement? MainContent { get => center.Content as UIElement; set => center.Content = value; }
     public UIElement? RightContent { get => right.Content as UIElement; set => right.Content = value; }
-    public double LeftPaneWidth { get => leftWidth; set { Validate(value); leftWidth = Math.Clamp(value, 180, 420); ArrangePanes(); } }
-    public double RightPaneWidth { get => rightWidth; set { Validate(value); rightWidth = Math.Clamp(value, 240, 480); ArrangePanes(); } }
-    public bool ShowLeftPane { get => showLeft; set { showLeft = value; ArrangePanes(); } }
-    public bool ShowRightPane { get => showRight; set { showRight = value; ArrangePanes(); } }
+    public double LeftPaneWidth { get => leftWidth; set { Validate(value); var next = Math.Clamp(value, 180, 420); if (leftWidth == next) return; leftWidth = next; ArrangePanes(); } }
+    public double RightPaneWidth { get => rightWidth; set { Validate(value); var next = Math.Clamp(value, 240, 480); if (rightWidth == next) return; rightWidth = next; ArrangePanes(); } }
+    public bool ShowLeftPane { get => showLeft; set { if (showLeft == value) return; showLeft = value; ArrangePanes(); } }
+    public bool ShowRightPane { get => showRight; set { if (showRight == value) return; showRight = value; ArrangePanes(); } }
     public bool IsLeftPaneVisible => left.Visibility == Visibility.Visible;
     public bool IsRightPaneVisible => right.Visibility == Visibility.Visible;
     public FrameworkElement LeftResizeGrip => leftGrip;
@@ -42,6 +42,8 @@ public sealed class EditorWorkspace : Grid
         grip.Width = 5; grip.IsTabStop = true; grip.Background = new SolidColorBrush(Microsoft.UI.Colors.LightGray);
         AutomationProperties.SetName(grip, isLeft ? "Resize palette pane" : "Resize properties pane");
         AutomationProperties.SetAutomationId(grip, isLeft ? "ResizeLeftPane" : "ResizeRightPane");
+        // Thumb consumes pointer input for dragging. Also observe its handled press so keyboard resizing has a focused target.
+        grip.AddHandler(PointerPressedEvent, new PointerEventHandler((_, _) => grip.Focus(FocusState.Pointer)), true);
         var initial = 0d;
         grip.DragStarted += (_, _) => initial = isLeft ? leftWidth : rightWidth;
         grip.DragDelta += (_, args) => { if (isLeft) LeftPaneWidth += args.HorizontalChange; else RightPaneWidth -= args.HorizontalChange; };

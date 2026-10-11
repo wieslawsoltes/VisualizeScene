@@ -61,10 +61,10 @@ public sealed partial class WorkbenchPage : Page
         Unloaded += (_, _) => { diagnosticTimer?.Stop(); layoutCancellation?.Cancel(); search.Dispose(); structure.Dispose(); inspector.Dispose(); overview.Dispose(); graph.Dispose(); };
         UpdateStatus();
     }
-    private void Run(Action action) { try { action(); PublishTestState(); } catch (Exception ex) { Report(ex.Message); } }
+    private void Run(Action action) { try { action(); UpdateChrome(); PublishTestState(); } catch (Exception ex) { Report(ex.Message); } }
     private async Task RunAsync(Func<Task> action)
     {
-        try { await action(); PublishTestState(); }
+        try { await action(); UpdateChrome(); PublishTestState(); }
         catch (OperationCanceledException) { status.Text = "Operation canceled."; }
         catch (Exception ex) { Report(ex.Message); }
     }

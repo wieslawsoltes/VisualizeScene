@@ -41,20 +41,13 @@ titled collapsible content area. `EditorIcon` supplies original vector command i
 through Uno's Skia surface, not an external icon font. `NodePalette` supports list and tile
 presentation and validates all templates before replacing its published list.
 
-## Workbench integration boundary
+## Workbench integration
 
-The overview optimization and revised existing palette implementation are used by the
-published workbench. The new `EditorWorkspace`, `EditorPane`, `EditorIcon`, and
-`GraphStructureView` are reusable APIs, **not yet wired into the published workbench**.
-The larger classic-shell integration upload was blocked by a tool safety check. That
-change was not retried through another route; local shell work is separate from the
-merge and is not described as compiled or deployed.
-
-The visual target is the compact palette/toolbars/overview arrangement in yWorks'
-published yFiles WPF 2.5 editor screenshot. It is a design reference, not a copied asset:
-https://marketplace.visualstudio.com/items?itemName=yWorks.yFilesWPF
-The software library has many demos rather than a single fixed application UI. No
-proprietary source, icons or branding are included. Full visual/API parity is not claimed.
+The classic shell recovered after PR #5 now connects these controls to the workbench.
+The former local-only integration boundary is superseded by [classic shell](classic-shell.md).
+Palette/Structure tabs, compact command icons, categorized tiles, splitters and pane
+collapse are exercised by `tests/browser/workspace.py`. The original WPF screenshot is
+a design reference, not copied assets or a screenshot-equivalence claim.
 
 ## Validation
 
@@ -65,11 +58,10 @@ managed scene redraw versus a warmed overview image. Both paths fit the same 10,
 graph. The baseline timing excludes the marker; the optimized timing includes it. Timings
 are CPU/raster measurements, not GPU timestamps, presentation FPS or input latency.
 
-The ordinary eight browser suites still run against the compiled Uno workbench. New
-workspace control APIs have package-only desktop/browser compile coverage. They do not
-have a deployed-workbench interaction claim; the integration remains outside this PR.
+The ordinary eight browser suites and the new classic workspace suite run against the compiled Uno workbench. New
+workspace control APIs retain package-only desktop/browser compile coverage; their
+workbench integration also has actual browser interaction coverage.
 The original GraphOverview is exercised by existing navigation/large-document scenarios.
 
-The review remains bounded: the previous numeric-analysis follow-ups, complete
-accessibility peers, specialized styles, additional layouts and GraphML extensions,
+The review remains bounded: complete accessibility peers, specialized styles, additional layouts and GraphML extensions,
 printing and proprietary API parity are not addressed by this batch.
