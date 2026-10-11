@@ -17,6 +17,10 @@ public static class WorkspaceApi
         var properties = new EditorPropertyGrid(); properties.AddGroup("Appearance");
         var color = new EditorColorField { Value = "#FFCC66" }; properties.AddProperty("Fill", color);
         properties.SetGroupExpanded("Appearance", false); properties.Clear();
+        color.IsMixed = true;
+        using var inspector = new GraphPropertyInspector { Target = graph };
+        _ = inspector.BatchItemCount; _ = inspector.BatchExaminedItems;
+        _ = graph.IsContextMenuOpen; _ = graph.FindContextCommand("Delete");
         var layout = new EditorWorkspace { LeftContent = pane, RightContent = structure, LeftPaneWidth = 230, RightPaneWidth = 300 };
         _ = layout.LeftResizeGrip; _ = new EditorIcon { Kind = EditorIconKind.Copy };
         layout.ResetPanes();

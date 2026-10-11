@@ -33,7 +33,8 @@ public sealed partial class GraphControl
         if (touchNavigator.ContactCount > 0) { args.Handled = true; return; }
         showKeyboardFocus = false;
         var point = args.GetCurrentPoint(this);
-        if (editingLabel || point.Properties.IsRightButtonPressed) { clicks.Reset(); return; }
+        if (editingLabel) { clicks.Reset(); return; }
+        if (point.Properties.IsRightButtonPressed) { CancelTouchNavigation(); return; }
         Focus(FocusState.Pointer);
         var screen = Position(args);
         if (point.Properties.IsMiddleButtonPressed) clicks.Reset();
@@ -141,6 +142,7 @@ public sealed partial class GraphControl
                 case VirtualKey.G when control: Session.Group(); break;
                 case VirtualKey.Delete: case VirtualKey.Back: Session.DeleteSelection(); break;
                 case VirtualKey.Escape: Session.CancelGesture(); Session.Mode = EditorMode.Select; break;
+                case VirtualKey.F10 when shift: case VirtualKey.Application: ShowGraphContextMenu(); break;
                 case VirtualKey.F2: await EditLabelAsync(); break;
                 case VirtualKey.Home: Fit(); break;
                 case VirtualKey.Left: Session.Nudge(new(shift ? -10 : -1, 0)); break;
@@ -152,22 +154,5 @@ public sealed partial class GraphControl
         }
         catch (Exception ex) { Error?.Invoke(this, ex.Message); }
         args.Handled = handled;
-    }
-    private MenuFlyout ContextMenu()
-    {
-        var menu = new MenuFlyout();
-        void Item(string text, Action action) { var item = new MenuFlyoutItem { Text = text }; item.Click += (_, _) => Run(action); menu.Items.Add(item); }
-        Item("Edit label  F2", () => _ = EditLabelAsync());
-        Item("Add independent label", AddLabelToSelection);
-        Item("Add port", () =>
-        {
-            var index = Document.Snapshot.Index(); var id = Session.Selection.FirstOrDefault(index.Nodes.ContainsKey);
-            if (id is null) return;
-            var node = index.Nodes[id]; Session.AddPort(id, new(node.Bounds.Right, node.Bounds.Center.Y));
-        });
-        Item("Duplicate  Ctrl+D", Session.Duplicate); Item("Delete  Del", Session.DeleteSelection);
-        menu.Items.Add(new MenuFlyoutSeparator()); Item("Group  Ctrl+G", Session.Group); Item("Ungroup  Ctrl+Shift+G", Session.Ungroup);
-        Item("Fold / unfold", () => { foreach (var id in Session.Selection.ToArray()) if (Document.Snapshot.Index().Nodes.TryGetValue(id, out var n) && n.IsGroup) Session.ToggleGroup(id); });
-        menu.Items.Add(new MenuFlyoutSeparator()); Item("Fit graph  Home", Fit); return menu;
     }
 }

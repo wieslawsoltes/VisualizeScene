@@ -90,6 +90,10 @@ with sync_playwright() as p:
         assert state()["performance"]["retainedPictures"] <= state()["performance"]["pictureCapacity"]
         page.screenshot(path=str(out / "large-selection.png"))
         record("Select-all rendering is viewport-bounded with a finite native picture budget")
+        page.wait_for_function("() => globalThis.visualizeSceneWorkspace?.inspector.batchCount === 39900", timeout=45000)
+        properties = page.evaluate("globalThis.visualizeSceneWorkspace.inspector")
+        assert properties["batchExamined"] == 39900 and properties["count"] <= 11
+        record("Mixed property summary examines each selected item once with a fixed number of editors")
         page.keyboard.press("Delete")
         wait("v.model.Graph.Nodes.length === 0 && v.performance.retainedPictures === 0")
         page.keyboard.press("Control+z")
