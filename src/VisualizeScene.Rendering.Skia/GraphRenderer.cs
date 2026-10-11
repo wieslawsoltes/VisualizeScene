@@ -6,7 +6,7 @@ using VisualizeScene.Core;
 namespace VisualizeScene.Rendering.Skia;
 
 public sealed record RenderOptions(bool ShowGrid = true, double GridSize = 10, IReadOnlySet<string>? Selection = null,
-    RectD? Marquee = null, (PointD Start, PointD End)? EdgePreview = null, bool Overview = false, PointD? CandidatePosition = null, bool IsValidConnection = true);
+    RectD? Marquee = null, (PointD Start, PointD End)? EdgePreview = null, bool Overview = false, PointD? CandidatePosition = null, bool IsValidConnection = true, IReadOnlyList<AlignmentGuide>? AlignmentGuides = null);
 public sealed record RenderStatistics(int VisibleNodes, int VisibleEdges, int CachedNodePictures, double CpuDrawMilliseconds);
 
 /// <summary>Draws directly to the caller's Skia canvas, including Uno's shared composition surface. Dispose with the view.</summary>
@@ -82,6 +82,7 @@ public sealed partial class GraphRenderer : IDisposable
                     var p = index.PortLocation(port.Id); Use(SKColors.White); canvas.DrawCircle(Point(p), (float)(3.5 / zoom), paint); Use(new SKColor(56, 103, 151), SKPaintStyle.Stroke, (float)(1 / zoom)); canvas.DrawCircle(Point(p), (float)(3.5 / zoom), paint);
                 }
                 DrawSelection(canvas, zoom, options);
+                DrawAlignmentGuides(canvas, zoom, options.AlignmentGuides);
             }
         }
         finally { canvas.RestoreToCount(save); }

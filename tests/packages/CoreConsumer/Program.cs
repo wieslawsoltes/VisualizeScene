@@ -28,6 +28,11 @@ session.LabelSizeProvider = renderer.MeasureLabel;
 var labelId = session.AddLabel("a", "Shaped annotation", new(700, 500));
 var measured = renderer.MeasureLabel(document.Snapshot.Index().Labels[labelId]);
 Check(measured.IsFinite && measured.X > 20 && measured.Y > 5, "native text shaping from renderer package");
+var placement = new LabelPlacementEngine().Calculate(document.Snapshot, measure: renderer.MeasureLabel);
+Check(placement.EligibleLabels == 1 && placement.Graph.Nodes == document.Snapshot.Nodes,
+    "label placement API from the packaged layout library");
+var snap = new ItemSnapIndex(document.Snapshot).Snap(new RectD(0, 0, 10, 10), new(), new HashSet<string>(), 1);
+Check(snap.Correction.IsFinite, "item snapping API from the packaged editing library");
 var before = document.Snapshot;
 session.MoveLabel(labelId, new(850, 650)); document.Undo();
 Check(GraphIO.ToJson(document.Snapshot) == GraphIO.ToJson(before), "editing package preserves exact undo");
