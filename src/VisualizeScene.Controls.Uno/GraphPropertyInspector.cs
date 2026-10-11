@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Automation;
 using VisualizeScene.Core;
 
 namespace VisualizeScene.Controls.Uno;
@@ -11,7 +12,11 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     private readonly StackPanel fields = new() { Spacing = 9 };
     private readonly TextBlock title = new() { Text = "Nothing selected", FontSize = 13, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
     private readonly TextBlock message = new() { TextWrapping = TextWrapping.Wrap, FontSize = 11 };
+    private readonly Dictionary<string, FrameworkElement> editors = new(StringComparer.Ordinal);
+    public FrameworkElement? FindPropertyEditor(string name) => editors.GetValueOrDefault(name);
     private GraphControl? target;
+    private GraphDocument? inspectedDocument;
+    private long inspectedRevision;
     public GraphControl? Target
     {
         get => target;
@@ -31,11 +36,14 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     private TextBox Text(string label, string value)
     {
         var input = new TextBox { Header = label, Text = value, FontSize = 12, MinWidth = 0 };
+        var name = label.Split(' ')[0]; editors[name] = input;
+        AutomationProperties.SetAutomationId(input, "Property" + name);
         fields.Children.Add(input); return input;
     }
     public void Refresh()
     {
-        fields.Children.Clear(); message.Text = "";
+        fields.Children.Clear(); editors.Clear(); message.Text = "";
+        inspectedDocument = target?.Document; inspectedRevision = inspectedDocument?.Revision ?? 0;
         if (target is null || target.Session.Selection.Count == 0) { title.Text = "Nothing selected"; message.Text = "Select a node, edge, port or label to inspect its properties. Changes are undoable."; return; }
         var ids = target.Session.Selection.ToArray(); title.Text = ids.Length == 1 ? "Item properties" : $"{ids.Length} items selected";
         if (ids.Length > 1) { message.Text = "Use the alignment and grouping commands for multiple items."; return; }
@@ -51,7 +59,13 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
             Apply(() =>
             {
                 var current = target.Document.Snapshot.Index().Nodes[id];
-                target.Document.Edit("Edit node properties", edit => edit.Update(current with { Text = label.Text, Shape = (NodeShape)shape.SelectedItem, Fill = fill.Text, Stroke = stroke.Text, Bounds = new(N(x), N(y), N(width), N(height)), Locked = locked.IsChecked == true }));
+                var bounds = new RectD(N(x), N(y), N(width), N(height));
+                target.Document.Edit("Edit node properties", edit =>
+                {
+                    // Set bounds before changing the lock flag; an already locked item cannot be moved silently.
+                    edit.SetNodeBounds(id, bounds);
+                    edit.Update(edit.Node(id) with { Text = label.Text, Shape = (NodeShape)shape.SelectedItem, Fill = fill.Text, Stroke = stroke.Text, Locked = locked.IsChecked == true });
+                });
             });
         }
         else if (index.Edges.TryGetValue(id, out var edge))
@@ -61,7 +75,8 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
             var directed = new CheckBox { Content = "Directed arrow", IsChecked = edge.Directed }; fields.Children.Add(directed);
             var endpoint = new TextBlock { Text = edge.SourceId + " → " + edge.TargetId, TextWrapping = TextWrapping.Wrap, FontSize = 11 }; fields.Children.Add(endpoint);
             Apply(() => { var current = target.Document.Snapshot.Index().Edges[id]; target.Document.Edit("Edit edge properties", edit => edit.Update(current with { Text = label.Text, Weight = N(weight), Stroke = stroke.Text, Routing = (EdgeRouting)routing.SelectedItem, Directed = directed.IsChecked == true })); });
-            var clear = new Button { Content = "Clear bends", HorizontalAlignment = HorizontalAlignment.Stretch }; clear.Click += (_, _) => target.Document.Edit("Clear edge bends", edit => edit.Update(edit.Edge(id) with { Bends = [] })); fields.Children.Add(clear);
+            var clear = new Button { Content = "Clear bends", HorizontalAlignment = HorizontalAlignment.Stretch };
+            Bind(clear, () => target.Document.Edit("Clear edge bends", edit => edit.Update(edit.Edge(id) with { Bends = [] }))); fields.Children.Add(clear);
         }
         else if (index.Labels.TryGetValue(id, out var independent))
         {
@@ -95,9 +110,24 @@ public sealed class GraphPropertyInspector : UserControl, IDisposable
     private void Apply(Action action)
     {
         var apply = new Button { Content = "Apply properties", HorizontalAlignment = HorizontalAlignment.Stretch };
-        apply.Click += (_, _) => { try { action(); message.Text = "Properties applied."; } catch (Exception ex) { message.Text = ex.Message; } }; fields.Children.Add(apply);
+        editors["Apply"] = apply; AutomationProperties.SetAutomationId(apply, "PropertyApply");
+        Bind(apply, action); fields.Children.Add(apply);
     }
-    private static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+    private void Bind(Button button, Action action)
+    {
+        var document = inspectedDocument; var revision = inspectedRevision;
+        button.Click += (_, _) =>
+        {
+            try
+            {
+                if (target?.Document != document || document?.Revision != revision)
+                    throw new InvalidOperationException("The graph changed; review the current properties before applying.");
+                action(); message.Text = "Properties applied.";
+            }
+            catch (Exception ex) { message.Text = ex.Message; }
+        };
+    }
+    private static string F(double value) => value.ToString("R", CultureInfo.InvariantCulture);
     private static double N(TextBox input) => double.Parse(input.Text, NumberStyles.Float, CultureInfo.InvariantCulture);
     public new void Dispose() => Target = null;
 }

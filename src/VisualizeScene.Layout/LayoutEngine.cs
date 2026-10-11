@@ -21,7 +21,7 @@ public sealed class LayoutEngine : ILayoutAlgorithm
     {
         GraphValidation.Validate(graph);
         if (!Enum.IsDefined(options.Kind) || !Enum.IsDefined(options.Direction) || !double.IsFinite(options.NodeSpacing) || !double.IsFinite(options.LayerSpacing) || options.NodeSpacing < 1 || options.LayerSpacing < 1 || options.Iterations < 1 || options.Iterations > 5000) throw new ArgumentException("Invalid layout options.");
-        var nodes = graph.Nodes.ToDictionary(n => n.Id); var index = graph.Index(); var diagnostics = new List<string>();
+        var nodes = graph.Nodes.ToDictionary(n => n.Id); var index = graph.Index(); var levelChildren = graph.Nodes.ToLookup(n => n.ParentId ?? ""); var diagnostics = new List<string>();
         if (graph.Nodes.Any(n => n.Locked)) diagnostics.Add("Locked positions are retained; overlap-free placement around fixed nodes is not guaranteed.");
         void Translate(string id, PointD delta)
         {
@@ -33,7 +33,7 @@ public sealed class LayoutEngine : ILayoutAlgorithm
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (depth > 128) throw new NotSupportedException("Layout nesting is limited to 128 levels.");
-            var children = graph.Nodes.Where(n => n.ParentId == parent).Select(n => n.Id).ToArray();
+            var children = levelChildren[parent ?? ""].Select(n => n.Id).ToArray();
             foreach (var id in children)
             {
                 var node = nodes[id];
@@ -78,12 +78,13 @@ public sealed class LayoutEngine : ILayoutAlgorithm
             _ => throw new NotSupportedException()
         };
         var result = new Dictionary<string, PointD>();
+        var originalNodes = graph.Index().Nodes;
         foreach (var node in normalized.Nodes)
         {
             var p = centers[node.Id];
             if (options.Direction is LayoutDirection.BottomToTop or LayoutDirection.RightToLeft) p = p with { Y = -p.Y };
             if (horizontal) p = new(p.Y, p.X);
-            var original = graph.Nodes.First(n => n.Id == node.Id);
+            var original = originalNodes[node.Id];
             result[node.Id] = p - new PointD(original.Bounds.Width / 2, original.Bounds.Height / 2);
         }
         return result;
@@ -92,7 +93,8 @@ public sealed class LayoutEngine : ILayoutAlgorithm
     {
         var result = new Dictionary<string, PointD>(); var count = graph.Nodes.Length;
         var columns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(count)));
-        var widths = Enumerable.Range(0, columns).Select(c => graph.Nodes.Where((_, i) => i % columns == c).Select(n => n.Bounds.Width).DefaultIfEmpty(0).Max()).ToArray();
+        var widths = new double[columns];
+        for (var i = 0; i < count; i++) widths[i % columns] = Math.Max(widths[i % columns], graph.Nodes[i].Bounds.Width);
         double y = 0;
         for (var row = 0; row * columns < count; row++)
         {

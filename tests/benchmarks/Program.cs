@@ -7,6 +7,7 @@ using SkiaSharp;
 using VisualizeScene.Core;
 using VisualizeScene.Editing;
 using VisualizeScene.Rendering.Skia;
+using VisualizeScene.Layout;
 
 // Deliberately uses only pre-PR3 public APIs so the identical harness builds against both revisions.
 if (args.Length != 2) throw new ArgumentException("Usage: benchmark output.json revision");
@@ -41,6 +42,16 @@ Measure("snapshot_index_warm", () => sink = graph.Index(), batch: 5);
 Measure("snapshot_validation_warm", () => GraphValidation.Validate(graph), batch: 5);
 Measure("hit_test_local", () => sink = editor.Hit(new(50, 30), handles: false), batch: 10);
 Measure("connection_candidate_local", () => sink = editor.FindConnectionCandidate(new(100, 30)), batch: 10);
+var defaultPolicy = new ConnectionPolicy(); var request = new ConnectionRequest(new("n0"), new("n1")); var graphIndex = graph.Index();
+Measure("connection_policy_default", () => sink = defaultPolicy.Evaluate(graphIndex, request), batch: 10);
+editor.SelectAll();
+Measure("selected_handle_hit", () => sink = editor.Hit(new(50, 30)), batch: 10);
+var selectedOptions = new RenderOptions(ShowGrid: false, Selection: editor.Selection);
+Measure("render_selected_local", () => renderer.Render(surface.Canvas, graph, viewport, 800, 400, selectedOptions));
+var deletionGraph = new GraphSnapshot(nodes.Take(1000).ToImmutableArray(), [], [], []);
+Measure("delete_1000_nodes", () => { var d = new GraphDocument(); d.Replace(deletionGraph); using var s = new EditorSession(d); s.SelectAll(); s.DeleteSelection(); sink = d.Snapshot; }, samples: 12);
+var layoutGraph = new GraphSnapshot(nodes, [], [], []);
+Measure("grid_layout_10000", () => sink = new LayoutEngine().Calculate(layoutGraph, new(LayoutKind.Grid)), samples: 12);
 Measure("label_edit_build", () => { var edit = new GraphEdit(graph); edit.Update(graph.Labels[0] with { Text = "Changed" }); sink = edit.Build(); });
 editor.Select(["n0"]); editor.SnapToGrid = false; editor.SnapToItems = false;
 Measure("node_drag_preview", () => { editor.PointerDown(new(50, 30)); editor.PointerMove(new(70, 45)); editor.CancelGesture(); });

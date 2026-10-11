@@ -72,11 +72,12 @@ public static class GraphIO
             }
             else
             {
-                var geometry = item.Descendants().FirstOrDefault(e => e.Name.LocalName == "Geometry");
-                var fill = (string?)item.Descendants().FirstOrDefault(e => e.Name.LocalName == "Fill")?.Attribute("color");
-                var stroke = (string?)item.Descendants().FirstOrDefault(e => e.Name.LocalName == "BorderStyle")?.Attribute("color");
-                var label = item.Elements(ns + "data").SelectMany(d => d.Descendants()).FirstOrDefault(e => e.Name.LocalName == "NodeLabel")?.Value ?? Data(item, "label") ?? id;
-                var shape = (string?)item.Descendants().FirstOrDefault(e => e.Name.LocalName == "Shape")?.Attribute("type");
+                var graphics = item.Elements(ns + "data").SelectMany(d => d.Descendants()).ToArray();
+                var geometry = graphics.FirstOrDefault(e => e.Name.LocalName == "Geometry");
+                var fill = (string?)graphics.FirstOrDefault(e => e.Name.LocalName == "Fill")?.Attribute("color");
+                var stroke = (string?)graphics.FirstOrDefault(e => e.Name.LocalName == "BorderStyle")?.Attribute("color");
+                var label = graphics.FirstOrDefault(e => e.Name.LocalName == "NodeLabel")?.Value ?? Data(item, "label") ?? id;
+                var shape = (string?)graphics.FirstOrDefault(e => e.Name.LocalName == "Shape")?.Attribute("type");
                 var kind = shape?.ToLowerInvariant() switch { "ellipse" => NodeShape.Ellipse, "diamond" => NodeShape.Diamond, "hexagon" => NodeShape.Hexagon, "parallelogram" => NodeShape.Parallelogram, "rectangle" => NodeShape.Rectangle, _ => NodeShape.RoundedRectangle };
                 var b = new RectD(Number((string?)geometry?.Attribute("x"), nodes.Count % 5 * 170), Number((string?)geometry?.Attribute("y"), nodes.Count / 5 * 100), Number((string?)geometry?.Attribute("width"), 120), Number((string?)geometry?.Attribute("height"), 54));
                 node = new(id, b, label, kind, GraphValidation.ValidColor(fill) ? fill! : "#DDEBFA", GraphValidation.ValidColor(stroke) ? stroke! : "#4778A5", parentId, item.Element(ns + "graph") is not null);

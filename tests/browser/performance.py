@@ -84,6 +84,45 @@ with sync_playwright() as p:
         wait(f"v.revision === {before_edit['revision']+2}")
         assert page.evaluate("JSON.stringify(globalThis.visualizeSceneState.model) === globalThis.performanceBaseline")
         record("An actual edit invalidates the cached document once and undo restores all graph data")
+        # Large-selection adorners and handles must remain viewport-bounded.
+        page.keyboard.press("Control+a")
+        wait("v.selection.length > 30000 && v.performance.selectionAdorners > 0 && v.performance.selectionAdorners < 256")
+        assert state()["performance"]["retainedPictures"] <= state()["performance"]["pictureCapacity"]
+        page.screenshot(path=str(out / "large-selection.png"))
+        record("Select-all rendering is viewport-bounded with a finite native picture budget")
+        page.keyboard.press("Delete")
+        wait("v.model.Graph.Nodes.length === 0 && v.performance.retainedPictures === 0")
+        page.keyboard.press("Control+z")
+        wait("v.model.Graph.Nodes.length === 10000")
+        assert page.evaluate("JSON.stringify(globalThis.visualizeSceneState.model) === globalThis.performanceBaseline")
+        record("Bulk deletion and undo preserve all 39900 graph items")
+        page.keyboard.press("Control+Home")
+        wait("v.selection.length === 1 && v.selection[0] === 'n0'")
+        page.keyboard.press("Control+Shift+ArrowRight")
+        wait("v.selection.length === 2 && v.selection.includes('n1')")
+        click("Group")
+        wait("v.selection.length === 1 && v.model.Graph.Nodes.some(n => n.Id === v.selection[0] && n.IsGroup)")
+        original = page.evaluate("""() => {const v=globalThis.visualizeSceneState; return {
+            group: v.model.Graph.Nodes.find(n => n.Id === v.selection[0]), child: v.model.Graph.Nodes.find(n => n.Id === 'n0'), revision:v.revision};}""")
+        target_x = original["group"]["Bounds"]["X"] + .123456789
+        click("PropertyX")
+        page.keyboard.press("Control+a")
+        page.keyboard.type(str(target_x), delay=10)
+        click("PropertyApply")
+        wait(f"v.revision === {original['revision']+1}")
+        child_x = page.evaluate("globalThis.visualizeSceneState.model.Graph.Nodes.find(n => n.Id === 'n0').Bounds.X")
+        assert abs(child_x - original["child"]["Bounds"]["X"] - .123456789) < 1e-8
+        record("Property-panel group movement translates its children with full precision")
+        revision_after = state()["revision"]
+        click("PropertyApply")
+        page.wait_for_timeout(350)
+        assert state()["revision"] == revision_after
+        record("Reapplying unchanged fractional properties neither rounds values nor creates history")
+        click("Undo")
+        click("Undo")
+        wait("v.model.Graph.Nodes.length === 10000 && !v.model.Graph.Nodes.some(n => n.IsGroup)")
+        assert page.evaluate("JSON.stringify(globalThis.visualizeSceneState.model) === globalThis.performanceBaseline")
+        record("Property and group operations restore exactly through undo")
         assert not errors, errors
     except Exception as error:
         traceback.print_exc()

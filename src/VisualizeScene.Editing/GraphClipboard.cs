@@ -11,8 +11,8 @@ public static class GraphClipboard
         foreach (var label in graph.Labels.Where(l => selected.Contains(l.Id)).ToArray()) selected.Add(label.OwnerId);
         var nodes = selected.Where(index.Nodes.ContainsKey).ToHashSet();
         foreach (var port in graph.Ports.Where(p => selected.Contains(p.Id))) nodes.Add(port.NodeId);
-        foreach (var id in nodes.ToArray()) nodes.UnionWith(index.Descendants(id).Select(n => n.Id));
         foreach (var e in graph.Edges.Where(e => selected.Contains(e.Id))) { nodes.Add(e.SourceId); nodes.Add(e.TargetId); }
+        foreach (var id in nodes.ToArray()) nodes.UnionWith(index.Descendants(id).Select(n => n.Id));
         var edges = graph.Edges.Where(e => nodes.Contains(e.SourceId) && nodes.Contains(e.TargetId)).ToImmutableArray();
         var ports = graph.Ports.Where(p => nodes.Contains(p.NodeId)).ToImmutableArray();
         var owners = nodes.Concat(edges.Select(e => e.Id)).Concat(ports.Select(p => p.Id)).ToHashSet();
