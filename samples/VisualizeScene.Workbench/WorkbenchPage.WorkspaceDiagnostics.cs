@@ -30,7 +30,7 @@ public sealed partial class WorkbenchPage
         }
         var editorText = string.Join(",", new[] { "Label", "Fill", "Stroke", "Width", "Height", "FontSize", "Weight" }.Select(name => (Name: name, Editor: inspector.FindPropertyEditor(name))).Where(pair => pair.Editor is TextBox).Select(pair => Q(pair.Name) + ":" + Q(((TextBox)pair.Editor!).Text)));
         var inspectorState = $"{{batchCount:{inspector.BatchItemCount},batchExamined:{inspector.BatchExaminedItems},text:{{{editorText}}},count:{inspector.PropertyCount},geometryExpanded:{(inspector.IsPropertyGroupExpanded("Geometry") ? "true" : "false")},message:{Q(inspector.MessageText)}}}";
-        foreach (var name in new[] { "EditLabel", "AddLabel", "AddPort", "Copy", "Cut", "Paste", "Duplicate", "Delete", "Group", "Ungroup", "Fold", "CreateNode", "SelectAll", "Fit" })
+        foreach (var name in new[] { "EditLabel", "AddLabel", "AddPort", "Copy", "Cut", "Paste", "Duplicate", "Delete", "Group", "Ungroup", "Fold", "CreateNode", "SelectAll", "Fit", "OrderBringToFront", "OrderSendToBack", "OrderRaise", "OrderLower" })
         {
             var key = "Context" + name;
             if (graph.IsContextMenuOpen && graph.FindContextCommand(name) is { } command) testControls[key] = command; else testControls.Remove(key);

@@ -11,6 +11,7 @@ namespace VisualizeScene.Serialization;
 public sealed record GraphFile(int Version, GraphSnapshot Graph);
 public sealed record GraphImportResult(GraphSnapshot Graph, IReadOnlyList<string> Diagnostics);
 [JsonSourceGenerationOptions(WriteIndented = true, UseStringEnumConverter = true, IgnoreReadOnlyProperties = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(string[]))]
 [JsonSerializable(typeof(GraphFile))]
 [JsonSerializable(typeof(GraphSnapshot))]
 [JsonSerializable(typeof(GraphNode))]
@@ -19,7 +20,7 @@ public sealed record GraphImportResult(GraphSnapshot Graph, IReadOnlyList<string
 [JsonSerializable(typeof(ImmutableArray<GraphLabel>))]
 public partial class GraphJsonContext : JsonSerializerContext;
 
-public static class GraphIO
+public static partial class GraphIO
 {
     public const int MaximumInputCharacters = 64 * 1024 * 1024;
     private static GraphSnapshot Normalize(GraphSnapshot graph) => graph with { Edges = graph.Edges.Select(e => e.Bends.IsDefault ? e with { Bends = [] } : e).ToImmutableArray() };
@@ -110,11 +111,17 @@ public static class GraphIO
                 TargetPortId = tp is null ? edge.TargetPortId : portIds.TryGetValue((target, tp), out var b) ? b : throw new FormatException("Unknown target port.") };
             edges.Add(edge);
         }
-        var supported = new HashSet<string> { "visualizescene.node", "visualizescene.edge", "visualizescene.port", "visualizescene.labels", "nodegraphics", "edgegraphics", "label", "weight" };
+        var supported = new HashSet<string> { "visualizescene.node", "visualizescene.edge", "visualizescene.port", "visualizescene.labels", "visualizescene.node-order", "visualizescene.port-order", "nodegraphics", "edgegraphics", "label", "weight" };
         foreach (var name in keyNames.Values.Distinct().Where(name => !supported.Contains(name))) diagnostics.Add($"Unsupported GraphML data key '{name}' was not imported.");
         if (root.Descendants().Any(e => e.Name.LocalName is "TableNode" or "BpmnNodeStyle" or "UMLClassNode" or "Style")) diagnostics.Add("Specialized yFiles styles are not supported; imported nodes use basic shapes.");
         var graph = new GraphSnapshot(nodes.ToImmutableArray(), edges.ToImmutableArray(), ports.ToImmutableArray(), labels);
         GraphValidation.Validate(graph);
+        var metadata = root.Element(ns + "graph");
+        graph = graph with
+        {
+            Nodes = RestoreOrder(graph.Nodes, metadata is null ? null : Data(metadata, "visualizescene.node-order"), n => n.Id),
+            Ports = RestoreOrder(graph.Ports, metadata is null ? null : Data(metadata, "visualizescene.port-order"), p => p.Id)
+        };
         return new(Normalize(graph), diagnostics);
     }
     public static string ToGraphML(GraphSnapshot graph)
@@ -124,6 +131,7 @@ public static class GraphIO
         var root = new XElement(ns + "graphml");
         void Key(string id, string owner, string name) => root.Add(new XElement(ns + "key", new XAttribute("id", id), new XAttribute("for", owner), new XAttribute("attr.name", name), new XAttribute("attr.type", "string")));
         Key("n", "node", "visualizescene.node"); Key("e", "edge", "visualizescene.edge"); Key("p", "port", "visualizescene.port"); Key("l", "graph", "visualizescene.labels");
+        Key("o", "graph", "visualizescene.node-order"); Key("q", "graph", "visualizescene.port-order");
         var children = graph.Nodes.ToLookup(n => n.ParentId ?? ""); var ports = graph.Ports.ToLookup(p => p.NodeId);
         XElement Build(string? parent, int depth)
         {
@@ -139,6 +147,8 @@ public static class GraphIO
             return element;
         }
         var main = Build(null, 0);
+        main.AddFirst(new XElement(ns + "data", new XAttribute("key", "o"), JsonSerializer.Serialize(graph.Nodes.Select(n => n.Id).ToArray(), GraphJsonContext.Default.StringArray)),
+            new XElement(ns + "data", new XAttribute("key", "q"), JsonSerializer.Serialize(graph.Ports.Select(p => p.Id).ToArray(), GraphJsonContext.Default.StringArray)));
         main.AddFirst(new XElement(ns + "data", new XAttribute("key", "l"), JsonSerializer.Serialize(graph.Labels, GraphJsonContext.Default.ImmutableArrayGraphLabel)));
         foreach (var edge in graph.Edges)
         {

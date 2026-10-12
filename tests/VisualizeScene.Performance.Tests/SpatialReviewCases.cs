@@ -8,6 +8,7 @@ static class SpatialReviewCases
 {
     public static void Run(Action<string, Action> test)
     {
+        DrawingOrderRenderingTests.Run(test);
         test("Packed spatial: randomized queries match exhaustive geometry", () => {
             var random = new Random(718); var items = Enumerable.Range(0, 10000).Select(i =>
                 (new RectD(random.Next(-1000, 1000), random.Next(-1000, 1000), random.Next(0, 300), random.Next(0, 300)), i)).ToArray();

@@ -67,6 +67,15 @@ Measure("grid_layout_10000", () => sink = new LayoutEngine().Calculate(layoutGra
 Measure("label_edit_build", () => { var edit = new GraphEdit(graph); edit.Update(graph.Labels[0] with { Text = "Changed" }); sink = edit.Build(); });
 editor.Select(["n0"]); editor.SnapToGrid = false; editor.SnapToItems = false;
 Measure("node_drag_preview", () => { editor.PointerDown(new(50, 30)); editor.PointerMove(new(70, 45)); editor.CancelGesture(); });
+var recolored = graph with { Nodes = graph.Nodes.Select(n => n with { Fill = "#FFCC66" }).ToImmutableArray() };
+var reordered = graph with { Nodes = graph.Nodes.Reverse().ToImmutableArray() };
+var toggle = false;
+Measure("style_revision_render_10000", () => {
+    toggle = !toggle; renderer.Render(surface.Canvas, toggle ? recolored : graph, viewport, 800, 400, options);
+}, samples: 20);
+Measure("order_revision_render_10000", () => {
+    toggle = !toggle; renderer.Render(surface.Canvas, toggle ? reordered : graph, viewport, 800, 400, options);
+}, samples: 20);
 Measure("render_warm_local", () => renderer.Render(surface.Canvas, graph, viewport, 800, 400, options));
 // Renderer construction and first preparation are reported separately, including any native disposal overhead.
 Measure("render_cold_local", () => { using var cold = new GraphRenderer(); cold.Render(surface.Canvas, graph, viewport, 800, 400, options); }, samples: 12);

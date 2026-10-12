@@ -23,6 +23,9 @@ public static class WorkspaceApi
         _ = graph.IsContextMenuOpen; _ = graph.FindContextCommand("Delete");
         var layout = new EditorWorkspace { LeftContent = pane, RightContent = structure, LeftPaneWidth = 230, RightPaneWidth = 300 };
         _ = layout.LeftResizeGrip; _ = new EditorIcon { Kind = EditorIconKind.Copy };
+        using var ordering = new GraphOrderToolbar { Target = graph };
+        _ = ordering.FindButton(DrawingOrder.BringToFront);
+        graph.ChangeDrawingOrder(DrawingOrder.Raise);
         layout.ResetPanes();
         layout.Unloaded += (_, _) => structure.Dispose();
         return layout;
