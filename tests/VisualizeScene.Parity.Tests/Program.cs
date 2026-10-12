@@ -18,6 +18,7 @@ NumericTests.Run(Test);
 PropertyEditingTests.Run(Test);
 BatchPropertyTests.Run(Test);
 ContextAlignmentTests.Run(Test);
+DrawingOrderTests.Run(Test);
 Directory.CreateDirectory("artifacts/validation");
 File.WriteAllText("artifacts/validation/parity.xml", new XElement("testsuite", new XAttribute("name", "Placement, snapping and selection"),
     new XAttribute("tests", results.Count), new XAttribute("failures", results.Count(r => r.Error is not null)), results.Select(r =>

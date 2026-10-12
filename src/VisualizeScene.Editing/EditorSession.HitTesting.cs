@@ -61,13 +61,15 @@ public sealed partial class EditorSession
     }
     private GraphNode? HitNode(PointD world, bool groupOnly)
     {
-        GraphNode? best = null; var order = -1;
+        GraphNode? best = null; var order = -1; var depth = -1;
         foreach (var id in hitNodes)
         {
             var node = index.Nodes[id];
-            if ((node.IsGroup && !node.Collapsed) != groupOnly || nodeOrder[id] <= order || !Geometry.HitNode(node, world)) continue;
+            var nodeDepth = groupOnly ? index.Depth(id) : 0;
+            if ((node.IsGroup && !node.Collapsed) != groupOnly || nodeDepth < depth ||
+                nodeDepth == depth && nodeOrder[id] <= order || !Geometry.HitNode(node, world)) continue;
             if (groupOnly && !(world.Y < node.Bounds.Y + 25 || world.X < node.Bounds.X + 6 || world.X > node.Bounds.Right - 6 || world.Y > node.Bounds.Bottom - 6)) continue;
-            best = node; order = nodeOrder[id];
+            best = node; order = nodeOrder[id]; depth = nodeDepth;
         }
         return best;
     }
