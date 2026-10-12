@@ -29,6 +29,8 @@ public sealed partial class GraphRenderer : IDisposable
     private readonly SKTypeface typeface;
     private readonly bool ownsTypeface;
     private readonly SKShaper shaper;
+    private readonly EdgeStyleRenderer edgePainter = new();
+    public int CachedEdgeDashEffects => edgePainter.CachedDashEffects;
     private readonly SKPaint paint = new() { IsAntialias = true };
     private bool disposed;
     public RenderStatistics Statistics { get; private set; } = new(0, 0, 0, 0);
@@ -75,6 +77,7 @@ public sealed partial class GraphRenderer : IDisposable
                 if (!GraphScene.IsEdgeVisible(index, edge))
                 { if (edges.Remove(edge.Id, out var hidden)) { hidden.Path.Dispose(); routesChanged = true; } continue; }
                 edges.TryGetValue(edge.Id, out var old);
+                if (old is not null && !SameEdgeBounds(old.Edge, edge)) routesChanged = true;
                 // Paint order and style metadata do not change routes or their spatial bounds.
                 var points = !geometryChanged && old is not null && SameEdgeGeometry(old.Edge, edge) ? old.Points : index.EdgePath(edge);
                 if (old is not null && old.Points.SequenceEqual(points))
@@ -85,7 +88,7 @@ public sealed partial class GraphRenderer : IDisposable
             }
             if (routesChanged || previous is null)
             {
-                edgeIndex = new(snapshot.Edges.Where(e => edges.ContainsKey(e.Id)).Select(e => (RectD.Enclose(edges[e.Id].Points.Select(p => new RectD(p.X, p.Y, 0, 0))).Inflate(14), e.Id)));
+                edgeIndex = new(snapshot.Edges.Where(e => edges.ContainsKey(e.Id)).Select(e => (EdgeVisualBounds(edges[e.Id]), e.Id)));
                 edgeIndexBuilds++;
             }
         }
@@ -144,7 +147,7 @@ public sealed partial class GraphRenderer : IDisposable
     {
         if (disposed) return; disposed = true;
         DisposePictures(); foreach (var edge in edges.Values) edge.Path.Dispose(); edges.Clear();
-        paint.Dispose(); shaper.Dispose(); if (ownsTypeface) typeface.Dispose();
+        edgePainter.Dispose(); paint.Dispose(); shaper.Dispose(); if (ownsTypeface) typeface.Dispose();
         graph = null; index = null; measuredLabels.Clear(); ClearAnnotationCache(); visibleNodeIds.Clear(); visibleEdgeIds.Clear(); visibleNodes.Clear(); visibleGroups.Clear();
         nodeIndex = new([]); edgeIndex = new([]); order.Clear(); depths.Clear();
     }

@@ -113,6 +113,7 @@ Test("Hit testing: 10000 annotated nodes inspect only nearby candidates", () => 
     Cases.Check(s.FindConnectionCandidate(new(100, 30))!.PortId == "p0" && s.LastHitStatistics.ExaminedEntries < 256);
 });
 RendererCases.Run(Test);
+EdgeRenderingTests.Run(Test);
 Directory.CreateDirectory("artifacts/validation");
 File.WriteAllText("artifacts/validation/performance.xml", new XElement("testsuite", new XAttribute("name", "Performance contracts"),
     new XAttribute("tests", results.Count), new XAttribute("failures", results.Count(r => r.Error is not null)), results.Select(r =>

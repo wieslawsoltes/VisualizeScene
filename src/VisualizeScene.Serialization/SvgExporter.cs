@@ -4,7 +4,7 @@ using VisualizeScene.Core;
 
 namespace VisualizeScene.Serialization;
 
-public static class SvgExporter
+public static partial class SvgExporter
 {
     private static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
     public static string Export(GraphSnapshot graph, Func<GraphLabel, PointD>? measureLabel = null)
@@ -39,7 +39,14 @@ public static class SvgExporter
         foreach (var edge in graph.Edges)
         {
             if (!GraphScene.IsEdgeVisible(index, edge)) continue;
-            var path = index.EdgePath(edge); var e = new XElement(ns + "polyline", new XAttribute("points", string.Join(" ", path.Select(p => $"{F(p.X)},{F(p.Y)}"))), new XAttribute("fill", "none"), new XAttribute("stroke", edge.Stroke), new XAttribute("stroke-width", "1.5"), new XAttribute("stroke-linejoin", "round"));
+            var path = index.EdgePath(edge);
+            if (edge.Style is not null)
+            {
+                StyledEdge(svg, edge, path);
+                if (edge.Text.Length > 0) Text(edge.Text, Geometry.PointAtFraction(path, .5) + new PointD(0, -9));
+                continue;
+            }
+            var e = new XElement(ns + "polyline", new XAttribute("points", string.Join(" ", path.Select(p => $"{F(p.X)},{F(p.Y)}"))), new XAttribute("fill", "none"), new XAttribute("stroke", edge.Stroke), new XAttribute("stroke-width", "1.5"), new XAttribute("stroke-linejoin", "round"));
             if (edge.Directed) e.Add(new XAttribute("marker-end", "url(#arrow)")); svg.Add(e);
             if (edge.Text.Length > 0) Text(edge.Text, Geometry.PointAtFraction(path, .5) + new PointD(0, -9));
         }
