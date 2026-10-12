@@ -10,7 +10,7 @@ using VisualizeScene.Rendering.Skia;
 using VisualizeScene.Layout;
 using VisualizeScene.Algorithms;
 
-// Deliberately uses only pre-PR3 public APIs so the identical harness builds against both revisions.
+// Use APIs shared with the pinned baseline so both runs compile identical harness sources.
 if (args.Length != 2) throw new ArgumentException("Usage: benchmark output.json revision");
 const int count = 10000;
 var nodes = Enumerable.Range(0, count).Select(i => new GraphNode("n" + i, new(i % 100 * 300, i / 100 * 250, 100, 60), "Node")).ToImmutableArray();
@@ -41,6 +41,8 @@ void Measure(string name, Action action, int samples = 40, int batch = 1)
     results.Add(new { name, samples, batch, medianMilliseconds = p50, p95Milliseconds = p95, medianAllocatedBytes = allocations[samples / 2] });
     Console.WriteLine($"{name}: p50 {p50:F6} ms; p95 {p95:F6} ms; {allocations[samples / 2]} bytes/op");
 }
+Func<GraphLabel, PointD> fixedMetrics = _ => new(80, 20);
+Measure("scene_bounds_10000", () => sink = GraphScene.Bounds(graph, fixedMetrics));
 var spatialItems = nodes.Select(n => (n.Bounds, n.Id)).ToArray();
 Measure("spatial_build_10000", () => sink = new SpatialIndex<string>(spatialItems));
 var spatial = new SpatialIndex<string>(spatialItems); var candidates = new List<string>(64);
@@ -84,7 +86,7 @@ renderer.Render(surface.Canvas, graph, viewport, 800, 400, options);
 using var image = surface.Snapshot(); using var bitmap = SKBitmap.FromImage(image);
 var report = new { revision = args[1], runtime = RuntimeInformation.FrameworkDescription, os = RuntimeInformation.OSDescription,
     processors = Environment.ProcessorCount, nodes = count, edges = edges.Length, ports = count, labels = count, viewport = new { width = 800, height = 400, zoom = 1 },
-    note = "Same-source, same-runner CPU/raster comparison. Full collection after warm-up before each workload in both revisions. Warm operation timings and current-thread managed allocation only; not hardware GPU/FPS/input-latency measurements. Cold render includes construction/disposal with shared model already warmed.",
+    note = "Same-source, same-runner CPU/raster comparison. Full collection after warm-up before each workload in both revisions. Warm operation timings and current-thread managed allocation only; not hardware GPU/FPS/input-latency measurements. Cold render includes construction/disposal with shared model already warmed. Scene bounds use fixed 80x20 label metrics; its allocation includes boxing the rectangle result into the sink.",
     pixelSha256 = Convert.ToHexString(SHA256.HashData(bitmap.Bytes)), results };
 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[0]))!);
 File.WriteAllText(args[0], JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
