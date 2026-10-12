@@ -80,10 +80,11 @@ public sealed partial class EditorSession
 {
     public void ChangeDrawingOrder(DrawingOrder operation)
     {
-        var revision = Document.Revision;
+        var revision = Document.Revision; var selected = Selection;
         CancelGesture();
-        if (Document.Revision != revision) throw new InvalidOperationException("The graph changed while preparing drawing order.");
-        var result = GraphDrawingOrder.Calculate(Document.Snapshot, Selection, operation);
+        if (Document.Revision != revision || !ReferenceEquals(selected, Selection))
+            throw new InvalidOperationException("The graph or selection changed while preparing drawing order.");
+        var result = GraphDrawingOrder.Calculate(Document.Snapshot, selected, operation);
         Document.Replace(result.Graph, operation switch
         {
             DrawingOrder.BringToFront => "Bring to front", DrawingOrder.SendToBack => "Send to back",

@@ -95,7 +95,7 @@ jobs:
           if-no-files-found: error
       - name: Install browser test dependencies
         id: browser_deps
-        run: python -m pip install playwright && python -m playwright install --with-deps chromium
+        run: python -m pip install playwright Pillow && python -m playwright install --with-deps chromium
       - name: Browser interactions
         run: |
           python -m http.server 8080 --directory artifacts/site >/tmp/visualizescene-http.log 2>&1 &

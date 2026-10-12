@@ -9,7 +9,10 @@ public sealed partial class GraphControl
     public void ChangeDrawingOrder(DrawingOrder operation)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
+        var document = Document; var session = Session; var revision = document.Revision; var selection = session.Selection;
         CloseGraphContextMenu(); CancelTouchNavigation();
-        Session.ChangeDrawingOrder(operation); Focus(FocusState.Programmatic); Invalidate();
+        if (disposed || Document != document || Session != session || document.Revision != revision || !ReferenceEquals(selection, session.Selection))
+            throw new InvalidOperationException("The graph or selection changed while preparing drawing order.");
+        session.ChangeDrawingOrder(operation); Focus(FocusState.Programmatic); Invalidate();
     }
 }

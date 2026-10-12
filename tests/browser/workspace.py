@@ -101,4 +101,7 @@ with sync_playwright() as p:
 if errors:
     sys.exit(1)
 # Use a fresh browser/fixture for batch and context scenarios, sharing the same compiled site.
-sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("batch.py")), url], check=False).returncode)
+batch_result = subprocess.run([sys.executable, str(Path(__file__).with_name("batch.py")), url], check=False).returncode
+if batch_result:
+    sys.exit(batch_result)
+sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("order.py")), url], check=False).returncode)
