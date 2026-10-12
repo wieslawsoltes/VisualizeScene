@@ -8,8 +8,9 @@ public static partial class Geometry
         ValidateRectangle(rectangle);
         if (!a.IsFinite || !b.IsFinite) throw new ArgumentException("Segment coordinates must be finite.");
         // Avoid overflow in subtraction for opposite, very large coordinates.
-        var scale = new[] { Math.Abs(a.X), Math.Abs(a.Y), Math.Abs(b.X), Math.Abs(b.Y),
-            Math.Abs(rectangle.X), Math.Abs(rectangle.Y), Math.Abs(rectangle.Right), Math.Abs(rectangle.Bottom) }.Max();
+        var scale = Math.Max(Math.Max(Math.Abs(a.X), Math.Abs(a.Y)), Math.Max(Math.Abs(b.X), Math.Abs(b.Y)));
+        scale = Math.Max(scale, Math.Max(Math.Max(Math.Abs(rectangle.X), Math.Abs(rectangle.Y)),
+            Math.Max(Math.Abs(rectangle.Right), Math.Abs(rectangle.Bottom))));
         if (scale > 1e150)
         {
             a = a * (1 / scale); b = b * (1 / scale);

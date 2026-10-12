@@ -13,7 +13,11 @@ public sealed record GraphPort(string Id, string NodeId, PointD RelativeLocation
 public sealed record GraphLabel(string Id, string OwnerId, string Text, PointD Offset, double FontSize = 12);
 public sealed record GraphEdge(string Id, string SourceId, string TargetId, string Text = "", double Weight = 1,
     ImmutableArray<PointD> Bends = default, string Stroke = "#607D99", bool Directed = true,
-    EdgeRouting Routing = EdgeRouting.Orthogonal, string? SourcePortId = null, string? TargetPortId = null);
+    EdgeRouting Routing = EdgeRouting.Orthogonal, string? SourcePortId = null, string? TargetPortId = null)
+{
+    /// <summary>Null retains the original 1.5-unit solid line and Directed-based target arrow.</summary>
+    public EdgeStyle? Style { get; init; }
+}
 
 public sealed record GraphSnapshot(ImmutableArray<GraphNode> Nodes, ImmutableArray<GraphEdge> Edges,
     ImmutableArray<GraphPort> Ports, ImmutableArray<GraphLabel> Labels)

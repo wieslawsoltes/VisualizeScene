@@ -77,6 +77,7 @@ public static class GraphValidation
                 throw new ArgumentException("Dangling edge endpoint.");
             if (!double.IsFinite(e.Weight) || !Enum.IsDefined(e.Routing) || !ValidColor(e.Stroke) || e.Text is null)
                 throw new ArgumentException("Invalid edge data.");
+            e.Style?.Validate();
             if (!e.Bends.IsDefault) foreach (var p in e.Bends) if (!p.IsFinite) throw new ArgumentException("Non-finite bend.");
             if (e.SourcePortId is not null && (!ports.TryGetValue(e.SourcePortId, out var sp) || sp.NodeId != e.SourceId))
                 throw new ArgumentException("Source port owner mismatch.");
@@ -98,10 +99,10 @@ public static class GraphValidation
         return new(new ReadOnlyDictionary<string, GraphNode>(nodes), new ReadOnlyDictionary<string, GraphEdge>(edges),
             new ReadOnlyDictionary<string, GraphPort>(ports), new ReadOnlyDictionary<string, GraphLabel>(labels));
     }
-    public static bool ValidColor(string? color)
+    public static bool ValidColor(string? value)
     {
-        if (color is not { Length: 7 } || color[0] != '#') return false;
-        for (var i = 1; i < color.Length; i++) if (!Uri.IsHexDigit(color[i])) return false;
+        if (value is null || value.Length != 7 || value[0] != '#') return false;
+        for (var i = 1; i < value.Length; i++) if (!Uri.IsHexDigit(value[i])) return false;
         return true;
     }
 }
