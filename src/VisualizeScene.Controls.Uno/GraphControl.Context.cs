@@ -12,6 +12,8 @@ public sealed partial class GraphControl
     private MenuFlyout? graphContextMenu;
     private readonly Dictionary<string, MenuFlyoutItem> contextItems = new(StringComparer.Ordinal);
     public bool IsContextMenuOpen { get; private set; }
+    /// <summary>Monotonic identity of the most recently requested native context popup.</summary>
+    public long ContextMenuGeneration { get; private set; }
     public FrameworkElement? FindContextCommand(string name) => contextItems.GetValueOrDefault(name);
 
     private void CloseGraphContextMenu()
@@ -37,7 +39,7 @@ public sealed partial class GraphControl
         var position = screen ?? (session.FocusedItemBounds is { } bounds ? session.Viewport.ToScreen(bounds.Center) : new(ActualWidth / 2, ActualHeight / 2));
         position = new(Math.Clamp(position.X, 0, Math.Max(0, ActualWidth)), Math.Clamp(position.Y, 0, Math.Max(0, ActualHeight)));
         var world = session.Viewport.ToWorld(position);
-        var menu = new MenuFlyout(); graphContextMenu = menu;
+        var menu = new MenuFlyout(); graphContextMenu = menu; ContextMenuGeneration++;
         bool Current() => !disposed && Document == owner && Session == session && owner.Revision == revision && ReferenceEquals(selected, session.Selection);
         void Item(string id, string text, Action action, bool enabled = true)
         {
@@ -76,7 +78,12 @@ public sealed partial class GraphControl
             if (!ReferenceEquals(graphContextMenu, menu)) return;
             graphContextMenu = null; IsContextMenuOpen = false; contextItems.Clear();
         };
-        IsContextMenuOpen = true;
+        // ShowAt requests a popup; it can load and reposition asynchronously. Publish
+        // open state only when this native flyout has actually opened, not before ShowAt.
+        menu.Opened += (_, _) =>
+        {
+            if (ReferenceEquals(graphContextMenu, menu)) IsContextMenuOpen = true;
+        };
         try { menu.ShowAt(this, new Point(position.X, position.Y)); }
         catch { CloseGraphContextMenu(); throw; }
     }
