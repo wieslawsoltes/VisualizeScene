@@ -69,6 +69,9 @@ Measure("align_1000_nodes", () => {
     var d = new GraphDocument(); d.Replace(deletionGraph); using var session = new EditorSession(d); session.SelectAll();
     session.Align(Alignment.HorizontalCenter); sink = d.Snapshot;
 }, samples: 20);
+var alignedGraph = deletionGraph with { Nodes = deletionGraph.Nodes.Select(n => n with { Bounds = n.Bounds with { X = 0 } }).ToImmutableArray() };
+var alignedIds = alignedGraph.Nodes.Select(n => n.Id).ToArray();
+Measure("align_noop_1000", () => sink = GraphAlignment.Calculate(alignedGraph, alignedIds, Alignment.Left));
 var layoutGraph = new GraphSnapshot(nodes, [], [], []);
 Measure("grid_layout_10000", () => sink = new LayoutEngine().Calculate(layoutGraph, new(LayoutKind.Grid)), samples: 12);
 Measure("label_edit_build", () => { var edit = new GraphEdit(graph); edit.Update(graph.Labels[0] with { Text = "Changed" }); sink = edit.Build(); });
