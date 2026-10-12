@@ -78,18 +78,19 @@ public sealed partial class WorkbenchPage
         tabs.Children.Add(paletteTab); tabs.Children.Add(structureTab); body.Children.Add(tabs); Grid.SetRow(content, 1); body.Children.Add(content); SelectTab(false);
         palettePane = new EditorPane { Title = "Graph tools", PaneContent = body }; Register("LeftPaneCollapse", palettePane.CollapseButton); root.Children.Add(palettePane);
         palettePane.CollapsedChanged += (_, _) => topRow.Height = palettePane.IsCollapsed ? GridLength.Auto : new(1, GridUnitType.Star);
-        overview.Height = 170; Register("Overview", overview); overviewPane = new EditorPane { Title = "Overview", PaneContent = overview, Margin = new(0, 4, 0, 0) };
-        Register("OverviewCollapse", overviewPane.CollapseButton); Grid.SetRow(overviewPane, 1); root.Children.Add(overviewPane);
         return new Border { Child = root, Background = Brush("#F2F3F5") };
     }
     private FrameworkElement BuildDocumentHeader()
     {
         var row = new Grid { Height = 27, Background = Brush("#E8ECF1"), Padding = new(7, 0, 7, 0) };
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        row.Children.Add(new EditorIcon { Kind = EditorIconKind.Layout, Margin = new(0, 0, 7, 0) }); Grid.SetColumn(documentCaption, 1); row.Children.Add(documentCaption); return row;
+        row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        row.Children.Add(new EditorIcon { Kind = EditorIconKind.Layout, Margin = new(0, 0, 7, 0) }); Grid.SetColumn(documentCaption, 1); row.Children.Add(documentCaption);
+        var ordering = CreateOrderToolbar(); Grid.SetColumn(ordering, 2); row.Children.Add(ordering); return row;
     }
     private void AddWorkspaceMenu(MenuBar bar)
     {
+        AddDrawingOrderMenu(bar);
         var view = bar.Items.First(item => item.Title == "View"); view.Items.Add(new MenuFlyoutSeparator());
         void Item(string text, string id, Action action) { var item = new MenuFlyoutItem { Text = text }; Register(id, item); item.Click += (_, _) => Run(action); view.Items.Add(item); }
         Item("Show / hide palette pane", "ToggleLeftPane", () => workspace.ShowLeftPane = !workspace.ShowLeftPane);
@@ -104,9 +105,6 @@ public sealed partial class WorkbenchPage
             modeText.Text = paintedMode switch { EditorMode.CreateNode => "Create node", EditorMode.CreateEdge => "Create edge", EditorMode.Pan => "Pan", _ => "Select" };
             foreach (var pair in modeButtons) { pair.Value.Background = Brush(pair.Key == paintedMode ? "#D6E8FB" : "#F8F8F8"); pair.Value.BorderBrush = Brush(pair.Key == paintedMode ? "#6599C9" : "#D9DDE1"); }
         }
-        if (testControls.GetValueOrDefault("Undo") is Control undo) undo.IsEnabled = document.CanUndo;
-        if (testControls.GetValueOrDefault("Redo") is Control redo) redo.IsEnabled = document.CanRedo;
-        foreach (var id in new[] { "Cut", "Copy", "Delete" }) if (testControls.GetValueOrDefault(id) is Control button) button.IsEnabled = graph.Session.Selection.Count > 0;
         var title = currentName + (dirty ? " *" : ""); if (paintedDocument != title) { paintedDocument = title; documentCaption.Text = title; }
         var zoom = graph.Session.Viewport.Zoom;
         if (paintedZoom != zoom)

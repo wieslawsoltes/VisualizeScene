@@ -35,8 +35,7 @@ public static class SvgExporter
             element.Add(new XAttribute("fill", node.Fill), new XAttribute("stroke", node.Stroke), new XAttribute("stroke-width", "1.5"), new XElement(ns + "title", node.Text)); svg.Add(element);
             Text(node.Text, node.IsGroup && !node.Collapsed ? new(b.Center.X, b.Y + 15) : b.Center, 13);
         }
-        int Depth(GraphNode n) { var depth = 0; while (n.ParentId is not null) { depth++; n = index.Nodes[n.ParentId]; } return depth; }
-        foreach (var n in visible.Where(n => n.IsGroup && !n.Collapsed).OrderBy(Depth)) Node(n);
+        foreach (var n in visible.Where(n => n.IsGroup && !n.Collapsed).OrderBy(n => index.Depth(n.Id))) Node(n);
         foreach (var edge in graph.Edges)
         {
             if (!GraphScene.IsEdgeVisible(index, edge)) continue;
