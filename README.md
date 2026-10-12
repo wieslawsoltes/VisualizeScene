@@ -63,6 +63,11 @@ are retained, positions stay fixed, and each command is one undoable edit. Avail
 updates on selection/document events, not every camera frame. The toolbar, sizing engine
 and selection-state query are independently reusable. See [arrangement contracts](docs/arrangement.md).
 
+**Fit groups to children** tightens selected expanded group frames around their contents.
+**Enlarge groups to children** retains existing space and only expands frames that need it.
+Both are available from the toolbar, Arrange menu and graph context menu, preserve child
+positions, and process selected nested groups from the inside out. See [group fitting](docs/group-sizing.md).
+
 ### Graph Find and Replace
 
 Use **Edit → Find graph text / Replace graph text**, or Ctrl+F / Ctrl+H while the graph
@@ -91,7 +96,7 @@ separately from per-frame view state.
 
 [Navigation contracts](docs/navigation.md) and [performance methodology](docs/performance.md)
 describe the APIs, validation and limits. Same-runner benchmark reports compare the
-current implementation with pinned previous-main baseline commit `c76c1648`; they are CPU/raster
+current implementation with pinned group-fitting baseline commit `5899c3d9`; they are CPU/raster
 measurements, not physical-GPU throughput or a promise of fixed frame rates.
 
 ## Reusable packages

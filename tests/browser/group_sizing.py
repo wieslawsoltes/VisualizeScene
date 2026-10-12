@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import traceback
 from playwright.sync_api import sync_playwright
+from native_context import target as context_target
 
 url = sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:8080/VisualizeScene/?test=1'
 out = Path('artifacts/browser-workspace/group-sizing'); out.mkdir(parents=True, exist_ok=True)
@@ -22,7 +23,7 @@ g['Ports']=[{'Id':'p','NodeId':'b','RelativeLocation':{'X':1,'Y':.5}}]
 g['Labels']=[{'Id':'la','OwnerId':'a','Text':'Node annotation','Offset':{'X':0,'Y':160},'FontSize':12},
              {'Id':'lp','OwnerId':'p','Text':'Port annotation','Offset':{'X':80,'Y':80},'FontSize':12}]
 fixture=out/'fixture.json';fixture.write_text(json.dumps({'Version':1,'Graph':g}))
-results,errors=[],[]
+results,errors,context_targets=[],[],[]
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True,args=['--enable-unsafe-swiftshader','--use-angle=swiftshader','--disable-dev-shm-usage'])
     page=browser.new_page(viewport={'width':1440,'height':1050},accept_downloads=True)
@@ -33,7 +34,8 @@ with sync_playwright() as p:
         page.wait_for_function('() => {const v=globalThis.visualizeSceneState,w=globalThis.visualizeSceneWorkspace;return v&&w&&('+expression+');}',timeout=45000)
     def click(name):
         key=json.dumps(name);wait(f'v.controls[{key}]?.width>0 && v.controls[{key}]?.height>0')
-        b=state()['controls'][name];x,y=b['x']+b['width']/2,b['y']+b['height']/2
+        b=context_target(page,name,context_targets) if name.startswith('Context') else state()['controls'][name]
+        x,y=b['x']+b['width']/2,b['y']+b['height']/2
         assert 0<=x<page.viewport_size['width'] and 0<=y<page.viewport_size['height'],(name,b)
         page.mouse.click(x,y);page.wait_for_timeout(180)
     def nodes():return {n['Id']:n for n in state()['model']['Graph']['Nodes']}
@@ -113,6 +115,9 @@ with sync_playwright() as p:
     finally:
         try:(out/'state.json').write_text(json.dumps(state(),indent=2))
         except Exception:pass
-        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno pointer, keyboard and file input. SwiftShader; no physical-GPU claim.'},indent=2))
+        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'contextTargets':context_targets,'note':'Compiled Uno pointer, keyboard and file input. SwiftShader; no physical-GPU claim.'},indent=2))
         browser.close()
-sys.exit(1 if errors else 0)
+if errors:
+    sys.exit(1)
+import subprocess
+sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("group_enlarge.py")), url], check=False).returncode)
