@@ -124,6 +124,7 @@ Test("Viewport: overflow during a transform cannot partially apply", () => {
     var v = new Viewport(); v.Restore(new(new(), .05)); var before = v.State; var revision = v.Revision;
     Throws(() => v.Pan(new(double.MaxValue, 0))); Check(v.State == before && v.Revision == revision);
 });
+ScrollTests.Run(Test);
 KeyboardTests.Run(Test);
 Directory.CreateDirectory("artifacts/validation");
 File.WriteAllText("artifacts/validation/navigation.xml", new XElement("testsuite", new XAttribute("name", "Navigation"),

@@ -41,11 +41,11 @@ public sealed partial class WorkbenchPage : Page
         RequestedTheme = ElementTheme.Light; Background = Brush("#F1F3F5"); graph.Document = document; overview.Target = graph; inspector.Target = graph; search.Target = graph; structure.Target = graph;
         document.Replace(SampleGraphs.Flowchart(), clearHistory: true); savePoint.MarkSaved();
         var root = new Grid(); root.RowDefinitions.Add(new() { Height = GridLength.Auto }); root.RowDefinitions.Add(new() { Height = GridLength.Auto }); root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height = new(27) });
-        var menu = BuildMenu(); AddSearchMenu(menu); AddWorkspaceMenu(menu); root.Children.Add(menu); var toolbar = BuildToolbar(); Grid.SetRow(toolbar, 1); root.Children.Add(toolbar);
+        var menu = BuildMenu(); AddSearchMenu(menu); AddWorkspaceMenu(menu); AddScrollMenu(menu); root.Children.Add(menu); var toolbar = BuildToolbar(); Grid.SetRow(toolbar, 1); root.Children.Add(toolbar);
         leftRail = BuildLeft(); rightRail = BuildRightRail(); workspace.LeftContent = leftRail; workspace.RightContent = rightRail;
         Register("StructureItems", structure.ItemsControl); Register("StructureToggle", structure.ToggleButton);
         Register("ResizeLeftPane", workspace.LeftResizeGrip); Register("ResizeRightPane", workspace.RightResizeGrip);
-        var editorArea = new Grid(); editorArea.RowDefinitions.Add(new() { Height = GridLength.Auto }); editorArea.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) }); editorArea.Children.Add(BuildDocumentHeader()); Grid.SetRow(graph, 1); Grid.SetRow(search, 1); editorArea.Children.Add(graph); editorArea.Children.Add(search);
+        var editorArea = new Grid(); editorArea.RowDefinitions.Add(new() { Height = GridLength.Auto }); editorArea.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) }); editorArea.Children.Add(BuildDocumentHeader()); var scrollView = CreateScrollViewer(); Grid.SetRow(scrollView, 1); editorArea.Children.Add(scrollView);
         var editorHost = new Border { BorderBrush = Brush("#B8C2CC"), BorderThickness = new(1), Child = editorArea, Background = Brush("#FFFFFF") }; workspace.MainContent = editorHost; Grid.SetRow(workspace, 2); root.Children.Add(workspace);
         var footer = new Grid { Background = Brush("#E7ECF2"), Padding = new(10, 0, 10, 0) };
         footer.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
@@ -61,7 +61,7 @@ public sealed partial class WorkbenchPage : Page
             await Task.Delay(100); graph.Fit(); ready = true; UpdateStatus(); StartDiagnostics(); if (diagnosticTimer is not null) diagnosticTimer.Tick += (_, _) => PublishWorkspaceState(); PublishTestState(); PublishWorkspaceState();
         };
         samples.SelectionChanged += async (_, _) => { if (samples.SelectedItem is string name && name != currentName) { if (await ConfirmDiscard()) LoadExample(name); else samples.SelectedItem = currentName; } };
-        Unloaded += (_, _) => { diagnosticTimer?.Stop(); layoutCancellation?.Cancel(); orderToolbar?.Dispose(); search.Dispose(); structure.Dispose(); inspector.Dispose(); overview.Dispose(); graph.Dispose(); };
+        Unloaded += (_, _) => { diagnosticTimer?.Stop(); layoutCancellation?.Cancel(); orderToolbar?.Dispose(); scrollViewer?.Dispose(); search.Dispose(); structure.Dispose(); inspector.Dispose(); overview.Dispose(); graph.Dispose(); };
         UpdateStatus();
     }
     private void Run(Action action) { try { action(); UpdateChrome(); PublishTestState(); } catch (Exception ex) { Report(ex.Message); } }

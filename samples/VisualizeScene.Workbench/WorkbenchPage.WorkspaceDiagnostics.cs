@@ -11,6 +11,7 @@ public sealed partial class WorkbenchPage
     {
 #if __WASM__
         if (!DiagnosticsEnabled || !ready) return;
+        PublishScrollState();
         static string N(double n) => double.IsFinite(n) ? n.ToString("R", CultureInfo.InvariantCulture) : "0";
         static string Q(string s) => "\"" + JsonEncodedText.Encode(s).ToString() + "\"";
         string Bounds(FrameworkElement e)

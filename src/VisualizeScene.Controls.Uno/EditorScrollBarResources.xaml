@@ -1,0 +1,88 @@
+<ResourceDictionary
+    x:Class="VisualizeScene.Controls.Uno.EditorScrollBarResources"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Original compact visuals. Named parts retain native ScrollBar range, repeat and drag behavior. -->
+  <Style x:Key="GraphScrollRepeat" TargetType="RepeatButton">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="IsTabStop" Value="False" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="#EDF0F4" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RepeatButton">
+          <Border x:Name="Surface" Background="{TemplateBinding Background}">
+            <VisualStateManager.VisualStateGroups>
+              <VisualStateGroup x:Name="CommonStates">
+                <VisualState x:Name="Normal" />
+                <VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Surface.Background" Value="#D5E5F4" /></VisualState.Setters></VisualState>
+                <VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Surface.Background" Value="#AFCDE8" /></VisualState.Setters></VisualState>
+                <VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="Glyph.Opacity" Value="0.35" /></VisualState.Setters></VisualState>
+              </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <ContentPresenter x:Name="Glyph" Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="GraphScrollThumb" TargetType="Thumb">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="IsTabStop" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Thumb">
+          <Grid Background="Transparent">
+            <VisualStateManager.VisualStateGroups>
+              <VisualStateGroup x:Name="CommonStates">
+                <VisualState x:Name="Normal" />
+                <VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Handle.Background" Value="#AEC9E0" /></VisualState.Setters></VisualState>
+                <VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Handle.Background" Value="#7FA8CB" /></VisualState.Setters></VisualState>
+                <VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="Handle.Opacity" Value="0.4" /></VisualState.Setters></VisualState>
+              </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <Border x:Name="Handle" Margin="2" Background="#BAC5D0" BorderBrush="#8596A6" BorderThickness="1" CornerRadius="1" />
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="DesktopGraphScrollBar" TargetType="ScrollBar">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="IsTabStop" Value="True" />
+    <Setter Property="UseSystemFocusVisuals" Value="True" />
+    <Setter Property="FocusVisualMargin" Value="-1" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ScrollBar">
+          <Grid Background="#EDF0F4">
+            <Grid x:Name="HorizontalRoot" Height="16" VerticalAlignment="Center">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <RepeatButton x:Name="HorizontalSmallDecrease" Width="16" Height="16" Style="{StaticResource GraphScrollRepeat}"><Path Data="M5,0 L0,3 L5,6 Z" Fill="#45576A" /></RepeatButton>
+              <RepeatButton x:Name="HorizontalLargeDecrease" Grid.Column="1" Height="16" Style="{StaticResource GraphScrollRepeat}" />
+              <Thumb x:Name="HorizontalThumb" Grid.Column="2" Height="16" MinWidth="16" Style="{StaticResource GraphScrollThumb}" />
+              <RepeatButton x:Name="HorizontalLargeIncrease" Grid.Column="3" Height="16" Style="{StaticResource GraphScrollRepeat}" />
+              <RepeatButton x:Name="HorizontalSmallIncrease" Grid.Column="4" Width="16" Height="16" Style="{StaticResource GraphScrollRepeat}"><Path Data="M0,0 L5,3 L0,6 Z" Fill="#45576A" /></RepeatButton>
+            </Grid>
+            <Grid x:Name="VerticalRoot" Width="16" HorizontalAlignment="Center">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <RepeatButton x:Name="VerticalSmallDecrease" Width="16" Height="16" Style="{StaticResource GraphScrollRepeat}"><Path Data="M0,5 L3,0 L6,5 Z" Fill="#45576A" /></RepeatButton>
+              <RepeatButton x:Name="VerticalLargeDecrease" Grid.Row="1" Width="16" Style="{StaticResource GraphScrollRepeat}" />
+              <Thumb x:Name="VerticalThumb" Grid.Row="2" Width="16" MinHeight="16" Style="{StaticResource GraphScrollThumb}" />
+              <RepeatButton x:Name="VerticalLargeIncrease" Grid.Row="3" Width="16" Style="{StaticResource GraphScrollRepeat}" />
+              <RepeatButton x:Name="VerticalSmallIncrease" Grid.Row="4" Width="16" Height="16" Style="{StaticResource GraphScrollRepeat}"><Path Data="M0,0 L3,5 L6,0 Z" Fill="#45576A" /></RepeatButton>
+            </Grid>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+</ResourceDictionary>

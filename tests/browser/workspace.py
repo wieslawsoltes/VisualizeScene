@@ -104,4 +104,7 @@ if errors:
 batch_result = subprocess.run([sys.executable, str(Path(__file__).with_name("batch.py")), url], check=False).returncode
 if batch_result:
     sys.exit(batch_result)
-sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("order.py")), url], check=False).returncode)
+order_result = subprocess.run([sys.executable, str(Path(__file__).with_name("order.py")), url], check=False).returncode
+if order_result:
+    sys.exit(order_result)
+sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("scrolling.py")), url], check=False).returncode)
