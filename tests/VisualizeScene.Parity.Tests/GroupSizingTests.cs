@@ -50,7 +50,10 @@ static class GroupSizingTests
         test("Group sizing: measured node and port labels enlarge their containing frame once", () => {
             var g = Graph(); var calls = 0;
             var r = GraphGroupSizing.Calculate(g, ["g"], measure: label => { calls++; return Measure(label); });
-            Check(r.Graph.Nodes[0].Bounds == new RectD(72, 52, 336, 316));
+            // The port sits at x=380; its 40-unit label extends right to 400, beyond the node's edge.
+            Check(GraphScene.LabelBounds(g.Index(), g.Labels[1], Measure(g.Labels[1])).Right == 400);
+            Check(r.Graph.Nodes[0].Bounds == new RectD(72, 52, 356, 316));
+            Check(GraphIO.ToJson(r.Graph) == GraphIO.ToJson(Reference(g, ["g"], new())));
             Check(calls == 2 && r.MeasuredLabels == 2 && r.ExaminedLabels == 2);
         });
         test("Group sizing: selected nested groups fit bottom-up independently of selection order", () => {
