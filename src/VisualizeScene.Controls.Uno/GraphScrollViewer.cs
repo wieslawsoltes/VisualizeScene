@@ -39,13 +39,14 @@ public sealed class GraphScrollViewer : UserControl, IDisposable
     public FrameworkElement HorizontalBar => horizontal;
     public FrameworkElement VerticalBar => vertical;
     public FrameworkElement FitButton => fit;
-    /// <summary>Read-only access to the native scrollbar thumb for host automation.</summary>
+    /// <summary>Read-only access to the visible native scrollbar thumb for host automation.</summary>
     public FrameworkElement? FindThumb(bool isHorizontal) => Find(isHorizontal ? horizontal : vertical);
     private static Thumb? Find(DependencyObject root)
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
         {
             var child = VisualTreeHelper.GetChild(root, i);
+            if (child is UIElement element && element.Visibility != Visibility.Visible) continue;
             if (child is Thumb thumb && thumb.ActualWidth > 0 && thumb.ActualHeight > 0) return thumb;
             if (Find(child) is { } found) return found;
         }
@@ -99,8 +100,9 @@ public sealed class GraphScrollViewer : UserControl, IDisposable
     }
     public GraphScrollViewer()
     {
-        horizontal = new(this, true) { Orientation = Orientation.Horizontal, Height = 16, MinHeight = 16 };
-        vertical = new(this, false) { Orientation = Orientation.Vertical, Width = 16, MinWidth = 16 };
+        var resources = new EditorScrollBarResources();
+        horizontal = new(this, true) { Orientation = Orientation.Horizontal, Height = 16, MinHeight = 16, Style = resources.ScrollBarStyle };
+        vertical = new(this, false) { Orientation = Orientation.Vertical, Width = 16, MinWidth = 16, Style = resources.ScrollBarStyle };
         root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) }); root.RowDefinitions.Add(new() { Height = new(16) });
         root.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); root.ColumnDefinitions.Add(new() { Width = new(16) });
         root.Children.Add(canvasHost); Grid.SetRow(horizontal, 1); root.Children.Add(horizontal);
