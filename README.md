@@ -48,6 +48,21 @@ The document's saved-state marker follows undo/redo back to the persisted snapsh
 [Workspace controls](docs/workspace.md) and [property/numeric review](docs/property-grid-and-numeric-review.md)
 document these reusable APIs, real browser tests and remaining compatibility boundaries.
 
+The Connections palette offers six visual presets. Single and mixed-edge selections can
+edit width, dash pattern and independent source/target decorations without changing
+algorithm direction. **Apply** and **Reset** stay outside the scrolling property rows.
+[Connection-palette contracts](docs/connection-palette-review.md) explain validation,
+precise stroke/marker picking, caption culling and remaining appearance limits.
+
+### Arrangement commands
+
+The compact document-header toolbar and **Arrange** menu provide six alignments, two
+distribution commands and **Make same width / height / size**. Size matching uses the
+selected keyboard-focus node, or the first selected node, as reference. Locked targets
+are retained, positions stay fixed, and each command is one undoable edit. Availability
+updates on selection/document events, not every camera frame. The toolbar, sizing engine
+and selection-state query are independently reusable. See [arrangement contracts](docs/arrangement.md).
+
 ### Graph Find and Replace
 
 Use **Edit → Find graph text / Replace graph text**, or Ctrl+F / Ctrl+H while the graph
@@ -76,7 +91,7 @@ separately from per-frame view state.
 
 [Navigation contracts](docs/navigation.md) and [performance methodology](docs/performance.md)
 describe the APIs, validation and limits. Same-runner benchmark reports compare the
-current implementation with pinned previous-main baseline commit `3e674fe8`; they are CPU/raster
+current implementation with pinned previous-main baseline commit `c76c1648`; they are CPU/raster
 measurements, not physical-GPU throughput or a promise of fixed frame rates.
 
 ## Reusable packages
@@ -86,10 +101,10 @@ measurements, not physical-GPU throughput or a promise of fixed frame rates.
 | `VisualizeScene.Core` | Geometry, immutable graph snapshots, validation, atomic edits, undo/redo, groups, ports, labels, spatial index |
 | `VisualizeScene.Algorithms` | Traversal, connectivity, shortest paths, spanning forests, PageRank, betweenness, coloring, maximum flow |
 | `VisualizeScene.Layout` | Six graph layouts, obstacle-aware orthogonal routing and automatic independent-label placement |
-| `VisualizeScene.Editing` | Platform-neutral gestures, connection policies, reconnection, port/label editing, indexed selection, clipboard, magnetic snapping, grouping and alignment |
+| `VisualizeScene.Editing` | Platform-neutral gestures, connection policies, reconnection, port/label editing, indexed selection, clipboard, magnetic snapping, grouping, alignment and reference-node sizing |
 | `VisualizeScene.Serialization` | Versioned JSON, GraphML interchange subset, standalone SVG |
 | `VisualizeScene.Rendering.Skia` | Retained node pictures, shaped text, culling, selection adorners and PNG export |
-| `VisualizeScene.Controls.Uno` | `GraphControl`, `GraphOverview`, `NodePalette`, `GraphPropertyInspector`, `GraphSearchControl`, workspace/pane/outline/icon controls, property grid and color field |
+| `VisualizeScene.Controls.Uno` | `GraphControl`, `GraphOverview`, `NodePalette`, `GraphPropertyInspector`, `GraphSearchControl`, workspace/pane/outline/icon controls, property grid, color field, edge palette and arrangement toolbar |
 
 The first five packages require no UI or graphics runtime. The Skia renderer accepts a caller-owned canvas. Uno owns the native graphics backend, so hardware acceleration depends on the host, browser, driver and fallback configuration. A software SwiftShader CI run validates rendering behavior, not physical GPU throughput.
 
@@ -163,7 +178,7 @@ A standalone Linux rendering host must provide the matching SkiaSharp and HarfBu
 
 `Build and validate` runs core conformance, editing/geometry, placement/snapping/selection and bounded text-layout regressions, builds desktop, publishes the actual Uno WebAssembly application, packages the controls, and runs Playwright pointer/keyboard tests against that application. Artifacts include source, NuGet packages, browser distribution, test reports and screenshots.
 
-The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. Nine browser suites cover the classic workspace and compact property grid; baseline interactions; ports, reconnection and independent labels; automatic placement and snapping; advanced selection; literal Find/Replace; touch/keyboard navigation; a 10,000-node performance fixture; and layouts, analysis, exports, file round trips and all sample graphs. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
+The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. Ten browser entry points cover the classic workspace and compact property grid; baseline interactions; ports, reconnection and independent labels; automatic placement and snapping; advanced selection; literal Find/Replace; touch/keyboard navigation; a 10,000-node performance fixture; layouts, analysis, exports, file round trips and all sample graphs; and arrangement/sizing tools. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
 
 ## Documentation
 

@@ -12,6 +12,16 @@ public sealed partial class EditorSession
         var bottom = corner is 2 or 3 ? Math.Max(point.Y, bounds.Y + 20) : bounds.Bottom;
         return new(left, top, right - left, bottom - top);
     }
+    public GraphNodeSizeResult? LastNodeSizing { get; private set; }
+    /// <summary>Uses the selected keyboard focus as reference, otherwise the first selected visible node. An explicit reference must be selected.</summary>
+    public void MatchNodeSize(NodeSizeMatch match, string? referenceId = null)
+    {
+        var revision = Document.Revision; var snapshot = Document.Snapshot;
+        var reference = referenceId ?? GraphArrangeState.Calculate(snapshot, Selection, FocusedItemId).ReferenceId;
+        var result = GraphNodeSizing.Calculate(snapshot, Selection, match, reference);
+        Document.Replace(result.Graph, "Match node " + match.ToString().ToLowerInvariant(), expectedRevision: revision);
+        LastNodeSizing = result;
+    }
     public GraphAlignmentResult? LastAlignment { get; private set; }
     public void Align(Alignment alignment)
     {

@@ -67,8 +67,8 @@ public sealed partial class WorkbenchPage
         // Never take focus from another editor, dialog, or newly opened menu.
         void Restore() => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
         {
-            if (!graph.IsLoaded || command.IsLoaded || graph.EditingLabelText is not null) return;
-            var focused = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+            if (XamlRoot is not { } root || !graph.IsLoaded || command.IsLoaded || graph.EditingLabelText is not null) return;
+            var focused = FocusManager.GetFocusedElement(root) as DependencyObject;
             static bool Within(DependencyObject? child, DependencyObject ancestor)
             {
                 for (var current = child; current is not null; current = VisualTreeHelper.GetParent(current))

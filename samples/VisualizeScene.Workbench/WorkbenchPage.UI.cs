@@ -41,7 +41,7 @@ public sealed partial class WorkbenchPage
         Register("ToggleItemSnap", snapItems); snapItems.Click += (_, _) => graph.Session.SnapToItems = snapItems.IsChecked; view.Items.Add(snapItems);
         AddNavigationMenu(view);
         var arrange = Menu("Arrange"); Item(arrange, "Group  Ctrl+G", graph.Session.Group); Item(arrange, "Ungroup  Ctrl+Shift+G", graph.Session.Ungroup); Item(arrange, "Fold / unfold selected groups", FoldSelected);
-        arrange.Items.Add(new MenuFlyoutSeparator()); foreach (var alignment in Enum.GetValues<Alignment>()) Item(arrange, alignment.ToString(), () => graph.Session.Align(alignment));
+        arrange.Items.Add(new MenuFlyoutSeparator()); AddArrangeCommands(arrange);
         var layout = Menu("Layout"); foreach (var kind in Enum.GetValues<LayoutKind>()) Item(layout, kind.ToString(), () => { layoutKind.SelectedItem = kind; _ = ApplyLayout(); }, "Layout" + kind); Item(layout, "Route edges around obstacles", () => _ = RouteEdges()); Item(layout, "Place independent labels", () => _ = PlaceLabels(), "MenuPlaceLabels");
         AddSelectionMenu(bar);
         var help = Menu("Help"); Item(help, "Editing guide", () => _ = ShowHelp()); Item(help, "Implementation status", () => _ = ShowStatus()); return bar;
@@ -54,7 +54,14 @@ public sealed partial class WorkbenchPage
         var header = new Grid { Padding = new(5, 4, 5, 3), Background = Brush("#ECF0F4") };
         for (var i = 0; i < 3; i++) header.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         var content = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch, Padding = new(7) }; Grid.SetRow(content, 1); root.Children.Add(header); root.Children.Add(content);
-        var layoutPanel = new StackPanel { Spacing = 6 }; layoutKind.Header = "Layout algorithm"; direction.Header = "Direction"; Register("LayoutKind", layoutKind); layoutPanel.Children.Add(layoutKind); layoutPanel.Children.Add(direction); layoutPanel.Children.Add(spacing); layoutPanel.Children.Add(layers);
+        var layoutPanel = new StackPanel { Spacing = 6 };
+        // Separate labels from the dropdown's hit region so its center cannot target a header boundary.
+        layoutKind.Header = direction.Header = null;
+        layoutPanel.Children.Add(new TextBlock { Text = "Layout algorithm", FontSize = 12 });
+        AutomationProperties.SetName(layoutKind, "Layout algorithm"); Register("LayoutKind", layoutKind); layoutPanel.Children.Add(layoutKind);
+        layoutPanel.Children.Add(new TextBlock { Text = "Direction", FontSize = 12 });
+        AutomationProperties.SetName(direction, "Layout direction"); Register("LayoutDirection", direction); layoutPanel.Children.Add(direction);
+        layoutPanel.Children.Add(spacing); layoutPanel.Children.Add(layers);
         layoutPanel.Children.Add(Button("Apply layout", "ApplyLayout", () => _ = ApplyLayout())); layoutPanel.Children.Add(Button("Route edges", "RouteEdges", () => _ = RouteEdges())); layoutPanel.Children.Add(Button("Cancel operation", "CancelLayout", () => layoutCancellation?.Cancel()));
         layoutPanel.Children.Add(new TextBlock { Text = "Layouts use an immutable snapshot, commit once and can be undone. Stale results are rejected.", TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = Brush("#657688") });
         AddLabelPlacementControls(layoutPanel);

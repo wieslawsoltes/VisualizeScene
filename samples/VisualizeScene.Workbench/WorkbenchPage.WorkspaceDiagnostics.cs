@@ -34,9 +34,16 @@ public sealed partial class WorkbenchPage
             catch { return "null"; }
         }
         var editorText = string.Join(",", new[] { "Label", "Fill", "Stroke", "Width", "Height", "FontSize", "Weight", "LineWidth" }.Select(name => (Name: name, Editor: inspector.FindPropertyEditor(name))).Where(pair => pair.Editor is TextBox).Select(pair => Q(pair.Name) + ":" + Q(((TextBox)pair.Editor!).Text)));
+        var choices = string.Join(",", new[] { "Shape", "Routing", "LinePattern", "SourceArrow", "TargetArrow" }
+            .Select(name => (Name: name, Editor: inspector.FindPropertyEditor(name))).Where(pair => pair.Editor is ComboBox)
+            .Select(pair =>
+            {
+                var input = (ComboBox)pair.Editor!;
+                return Q(pair.Name) + $":{{index:{input.SelectedIndex},open:{(input.IsDropDownOpen ? "true" : "false")},value:{Q(input.SelectedItem?.ToString() ?? "")}}}";
+            }));
         var focused = new[] { "Label", "Text", "X", "Y", "Width", "Height", "Fill", "Stroke", "LineWidth", "FontSize", "OffsetX", "OffsetY", "RelativeX", "RelativeY", "Weight" }
             .FirstOrDefault(name => inspector.FindPropertyEditor(name) is Control input && input.FocusState != FocusState.Unfocused);
-        var inspectorState = $"{{focused:{(focused is null ? "null" : Q(focused))},batchCount:{inspector.BatchItemCount},batchExamined:{inspector.BatchExaminedItems},text:{{{editorText}}},count:{inspector.PropertyCount},geometryExpanded:{(inspector.IsPropertyGroupExpanded("Geometry") ? "true" : "false")},message:{Q(inspector.MessageText)}}}";
+        var inspectorState = $"{{choices:{{{choices}}},focused:{(focused is null ? "null" : Q(focused))},batchCount:{inspector.BatchItemCount},batchExamined:{inspector.BatchExaminedItems},text:{{{editorText}}},count:{inspector.PropertyCount},geometryExpanded:{(inspector.IsPropertyGroupExpanded("Geometry") ? "true" : "false")},message:{Q(inspector.MessageText)}}}";
         foreach (var name in new[] { "EditLabel", "AddLabel", "AddPort", "Copy", "Cut", "Paste", "Duplicate", "Delete", "Group", "Ungroup", "Fold", "CreateNode", "SelectAll", "Fit", "OrderBringToFront", "OrderSendToBack", "OrderRaise", "OrderLower" })
         {
             var key = "Context" + name;

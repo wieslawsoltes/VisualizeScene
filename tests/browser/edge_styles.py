@@ -13,7 +13,7 @@ for ident, x, y in [('a', 0, 0), ('b', 450, 0), ('c', 0, 300), ('d', 450, 300)]:
     g['Nodes'].append({'Id': ident, 'Bounds': {'X': x, 'Y': y, 'Width': 100, 'Height': 60},
                       'Text': ident.upper(), 'Shape': 'RoundedRectangle', 'Fill': '#FFCC66', 'Stroke': '#A87523'})
 fixture = out / 'fixture.json'; fixture.write_text(json.dumps({'Version': 1, 'Graph': g}))
-results, errors = [], []
+results, errors, choices = [], [], []
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, args=['--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--disable-dev-shm-usage'])
     page = browser.new_page(viewport={'width': 1440, 'height': 1050}, accept_downloads=True)
@@ -35,9 +35,16 @@ with sync_playwright() as p:
         page.keyboard.press('Control+a'); page.keyboard.insert_text(text)
         wait('w.inspector.text['+json.dumps(name)+']==='+json.dumps(text))
     def choose(name, value):
-        click('Property'+name); page.keyboard.press('Home')
+        key = json.dumps(name)
+        click('Property'+name)
+        wait(f'w.inspector.choices[{key}]?.open===true')
+        choices.append({'field':name,'stage':'opened','state':page.evaluate(f'globalThis.visualizeSceneWorkspace.inspector.choices[{key}]')})
+        page.keyboard.press('Home')
         for _ in range(value): page.keyboard.press('ArrowDown')
-        page.keyboard.press('Enter'); page.wait_for_timeout(250)
+        page.keyboard.press('Enter')
+        wait(f'w.inspector.choices[{key}]?.index==={value} && w.inspector.choices[{key}].open===false')
+        choices.append({'field':name,'stage':'selected','state':page.evaluate(f'globalThis.visualizeSceneWorkspace.inspector.choices[{key}]')})
+        page.wait_for_timeout(250)
     def connect(template, source='a', target='b'):
         revision = state()['revision']; count = len(state()['model']['Graph']['Edges'])
         click('EdgeTemplate'+str(template)); wait("v.mode==='CreateEdge'")
@@ -128,8 +135,10 @@ with sync_playwright() as p:
         try: page.screenshot(path=str(out/'failure.png'))
         except Exception: pass
     finally:
-        try: (out/'state.json').write_text(json.dumps(state(),indent=2))
+        try:
+            (out/'state.json').write_text(json.dumps(state(),indent=2))
+            (out/'workspace.json').write_text(json.dumps(page.evaluate('globalThis.visualizeSceneWorkspace'),indent=2))
         except Exception: pass
-        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno, native pointer/keyboard/file input; SwiftShader software rendering.'},indent=2))
+        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'choices':choices,'note':'Compiled Uno, native pointer/keyboard/file input; SwiftShader software rendering.'},indent=2))
         browser.close()
 sys.exit(1 if errors else 0)

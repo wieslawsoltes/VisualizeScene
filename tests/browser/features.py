@@ -41,11 +41,16 @@ with sync_playwright() as p:
 
     def choose(name, index):
         click(name)
+        if name == "LayoutKind":
+            page.wait_for_function("() => globalThis.visualizeSceneLayout?.open===true")
         page.keyboard.press("Home")
         for _ in range(index):
             page.keyboard.press("ArrowDown")
         page.keyboard.press("Enter")
-        page.wait_for_timeout(250)
+        if name == "LayoutKind":
+            page.wait_for_function("i => globalThis.visualizeSceneLayout?.kind===i && globalThis.visualizeSceneLayout.open===false", arg=index)
+        else:
+            page.wait_for_timeout(250)
 
     def node_point(node_id):
         s = state()

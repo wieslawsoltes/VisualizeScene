@@ -108,4 +108,12 @@ Check(selectedBounds == document.Snapshot.Index().Nodes["a"].Bounds, "packaged s
 var labelBounds = GraphScene.BoundsForItems(document.Snapshot, [labelId], renderer.MeasureLabel);
 Check(labelBounds == session.GetLabelBounds(document.Snapshot.Index().Labels[labelId]), "packaged selected annotation uses actual shaped metrics");
 Check(GraphScene.BoundsForItems(document.Snapshot, []) is null, "packaged empty-selection bounds are inert");
+var sizingSnapshot = document.Snapshot;
+var sizeReference = document.Snapshot.Index().Nodes["a"].Bounds;
+document.Edit("Different node size", edit => edit.Update(edit.Node("b") with { Bounds = edit.Node("b").Bounds with { Width = sizeReference.Width + 25 } }));
+var sizeBefore = document.Snapshot; session.Select(["a", "b"]); session.MatchNodeSize(NodeSizeMatch.Width, "a");
+Check(document.Snapshot.Index().Nodes["b"].Bounds.Width == sizeReference.Width, "packaged reference-node sizing");
+document.Undo(); Check(ReferenceEquals(sizeBefore, document.Snapshot), "packaged sizing exact undo");
+document.Undo(); Check(ReferenceEquals(sizingSnapshot, document.Snapshot), "packaged sizing fixture cleanup");
+Check(GraphArrangeState.Calculate(document.Snapshot, ["a", "b"]).MovableRoots == 2, "packaged arrangement state");
 Console.WriteLine("Package-only consumer passed; no source project references.");

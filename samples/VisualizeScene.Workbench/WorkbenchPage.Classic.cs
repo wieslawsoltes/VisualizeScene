@@ -92,7 +92,9 @@ public sealed partial class WorkbenchPage
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); row.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         row.Children.Add(new EditorIcon { Kind = EditorIconKind.Layout, Margin = new(0, 0, 7, 0) }); Grid.SetColumn(documentCaption, 1); row.Children.Add(documentCaption);
-        var ordering = CreateOrderToolbar(); Grid.SetColumn(ordering, 2); row.Children.Add(ordering); return row;
+        var ordering = CreateArrangementTools(); Grid.SetColumn(ordering, 2); row.Children.Add(ordering);
+        row.SizeChanged += (_, _) => ordering.MaxWidth = Math.Max(0, row.ActualWidth - 115);
+        return row;
     }
     private void AddWorkspaceMenu(MenuBar bar)
     {
