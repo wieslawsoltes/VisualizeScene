@@ -29,6 +29,8 @@ public sealed partial class WorkbenchPage
         if (!DiagnosticsEnabled || scrollViewer is null) return;
         static string N(double v) => double.IsFinite(v) ? v.ToString("R", CultureInfo.InvariantCulture) : "0";
         static string Axis(ViewportScrollAxis a) => $"{{min:{N(a.MinimumOrigin)},max:{N(a.MaximumOrigin)},origin:{N(a.Origin)},value:{N(a.Value)},page:{N(a.ViewportSize)},small:{N(a.SmallChange)},large:{N(a.LargeChange)},enabled:{(a.CanScroll ? "true" : "false")}}}";
+        foreach (var (name, horizontal) in new[] { ("GraphHThumb", true), ("GraphVThumb", false) })
+            if (scrollViewer.FindThumb(horizontal) is { } thumb) testControls[name] = thumb; else testControls.Remove(name);
         var model = scrollViewer.ScrollModel;
         Uno.Foundation.WebAssemblyRuntime.InvokeJS($"globalThis.visualizeSceneScroll={{visible:{(scrollViewer.ScrollBarsVisible ? "true" : "false")},dragging:{(scrollViewer.IsDragging ? "true" : "false")},builds:{scrollViewer.ModelBuilds},horizontal:{Axis(model.Horizontal)},vertical:{Axis(model.Vertical)}}};");
 #endif

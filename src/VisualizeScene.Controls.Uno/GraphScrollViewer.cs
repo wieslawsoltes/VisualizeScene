@@ -28,6 +28,7 @@ public sealed class GraphScrollViewer : UserControl, IDisposable
     private GraphSnapshot? lastGraph;
     private ViewportState lastView, expectedView;
     private double lastWidth, lastHeight;
+    private RectD lastBounds;
     private bool updating, disposed, rejectThumb, visible = true;
     private bool? draggingHorizontal;
     private GraphDocument? gestureDocument;
@@ -38,6 +39,18 @@ public sealed class GraphScrollViewer : UserControl, IDisposable
     public FrameworkElement HorizontalBar => horizontal;
     public FrameworkElement VerticalBar => vertical;
     public FrameworkElement FitButton => fit;
+    /// <summary>Read-only access to the native scrollbar thumb for host automation.</summary>
+    public FrameworkElement? FindThumb(bool isHorizontal) => Find(isHorizontal ? horizontal : vertical);
+    private static Thumb? Find(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is Thumb thumb && thumb.ActualWidth > 0 && thumb.ActualHeight > 0) return thumb;
+            if (Find(child) is { } found) return found;
+        }
+        return null;
+    }
     public bool ScrollBarsVisible
     {
         get => visible;
@@ -59,6 +72,8 @@ public sealed class GraphScrollViewer : UserControl, IDisposable
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             if (ReferenceEquals(overlay, value)) return;
+            if (value is not null && (ReferenceEquals(value, target) || VisualTreeHelper.GetParent(value) is not null))
+                throw new ArgumentException("The overlay must be an unparented element distinct from the graph.", nameof(value));
             if (overlay is not null) canvasHost.Children.Remove(overlay);
             overlay = value; if (overlay is not null) canvasHost.Children.Add(overlay);
         }
@@ -70,6 +85,8 @@ public sealed class GraphScrollViewer : UserControl, IDisposable
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             if (ReferenceEquals(target, value)) return;
+            if (value is not null && (ReferenceEquals(value, overlay) || VisualTreeHelper.GetParent(value) is not null))
+                throw new ArgumentException("The graph must not already belong to another visual parent.", nameof(value));
             Detach(); target = value; lastGraph = null;
             if (target is not null)
             {
@@ -130,17 +147,19 @@ public sealed class GraphScrollViewer : UserControl, IDisposable
             if (gestureDocument == target.Document && state == expectedView) return;
             RejectGesture(); // An external camera/document change invalidates the old drag coordinate frame.
         }
-        if (!force && ReferenceEquals(lastGraph, target.Document.Snapshot) && lastView == state &&
+        var snapshot = target.Document.Snapshot;
+        var contentBounds = target.ContentBounds;
+        if (!force && lastBounds == contentBounds && ReferenceEquals(lastGraph, target.Document.Snapshot) && lastView == state &&
             lastWidth == target.ActualWidth && lastHeight == target.ActualHeight) return;
         Run(() =>
         {
-            var model = ViewportScrollModel.Calculate(target.ContentBounds, state, target.ActualWidth, target.ActualHeight);
+            var model = ViewportScrollModel.Calculate(contentBounds, state, target.ActualWidth, target.ActualHeight);
             updating = true;
             try
             {
                 SetBar(horizontal, model.Horizontal); SetBar(vertical, model.Vertical); fit.IsEnabled = true;
-                ScrollModel = model; ModelBuilds++; lastGraph = target.Document.Snapshot; lastView = state;
-                lastWidth = target.ActualWidth; lastHeight = target.ActualHeight;
+                ScrollModel = model; ModelBuilds++; lastGraph = snapshot; lastView = state;
+                lastWidth = target.ActualWidth; lastHeight = target.ActualHeight; lastBounds = contentBounds;
             }
             finally { updating = false; }
         });
