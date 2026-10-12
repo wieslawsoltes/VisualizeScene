@@ -28,7 +28,8 @@ public sealed partial class WorkbenchPage
         {
             if (command is GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.SameWidth) menu.Items.Add(new MenuFlyoutSeparator());
             var item = new MenuFlyoutItem { Text = GraphArrangeToolbar.Caption(command), IsEnabled = false };
-            Register("MenuArrange" + command, item); item.Click += (_, _) => Run(() => graph.ArrangeNodes(command));
+            Register("MenuArrange" + command, item);
+            item.Click += (_, _) => Run(() => { graph.ArrangeNodes(command); ReturnSelectionFocus(menu, item); });
             arrangeMenuItems.Add(command, item); menu.Items.Add(item);
         }
         UpdateArrangeMenu();
@@ -37,6 +38,8 @@ public sealed partial class WorkbenchPage
     {
 #if __WASM__
         if (!DiagnosticsEnabled || arrangeToolbar is null) return;
+        // Read-only native dropdown state lets tests wait for actual open/close rather than guessing animation delays.
+        Uno.Foundation.WebAssemblyRuntime.InvokeJS($"globalThis.visualizeSceneLayout={{kind:{layoutKind.SelectedIndex},open:{(layoutKind.IsDropDownOpen ? "true" : "false")},direction:{direction.SelectedIndex},directionOpen:{(direction.IsDropDownOpen ? "true" : "false")}}};");
         var state = arrangeToolbar.State;
         var reference = state.ReferenceId is { } id ? "\"" + System.Text.Json.JsonEncodedText.Encode(id).ToString() + "\"" : "null";
         Uno.Foundation.WebAssemblyRuntime.InvokeJS($"globalThis.visualizeSceneArrange={{builds:{arrangeToolbar.StateBuilds},roots:{state.MovableRoots},reference:{reference}}};");

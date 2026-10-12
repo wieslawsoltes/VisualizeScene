@@ -19,7 +19,15 @@ public sealed partial class GraphControl
             case GraphArrangeCommand.SameWidth: session.MatchNodeSize(NodeSizeMatch.Width); break;
             case GraphArrangeCommand.SameHeight: session.MatchNodeSize(NodeSizeMatch.Height); break;
             case GraphArrangeCommand.SameSize: session.MatchNodeSize(NodeSizeMatch.Both); break;
-            default: session.Align((Alignment)(int)command); break;
+            case GraphArrangeCommand.AlignLeft: session.Align(Alignment.Left); break;
+            case GraphArrangeCommand.AlignHorizontalCenter: session.Align(Alignment.HorizontalCenter); break;
+            case GraphArrangeCommand.AlignRight: session.Align(Alignment.Right); break;
+            case GraphArrangeCommand.AlignTop: session.Align(Alignment.Top); break;
+            case GraphArrangeCommand.AlignVerticalCenter: session.Align(Alignment.VerticalCenter); break;
+            case GraphArrangeCommand.AlignBottom: session.Align(Alignment.Bottom); break;
+            case GraphArrangeCommand.DistributeHorizontal: session.Align(Alignment.DistributeHorizontal); break;
+            case GraphArrangeCommand.DistributeVertical: session.Align(Alignment.DistributeVertical); break;
+            default: throw new ArgumentOutOfRangeException(nameof(command));
         }
         Focus(FocusState.Programmatic); Invalidate();
     }

@@ -105,7 +105,11 @@ with sync_playwright() as p:
         record('A locked selected reference supplies dimensions without being moved or resized')
         select('a', 'b'); revision = state()['revision']; click('MenuArrange'); click('MenuArrangeSameHeight')
         wait(f'v.revision==={revision+1} && !v.controls.MenuArrangeSameHeight'); assert nodes()['b']['Bounds']['Height'] == 50
-        undo(baseline); record('The Arrange menu executes the same size command as the toolbar')
+        sized = state()['model']; wait('v.graphFocused'); page.keyboard.press('ArrowRight'); wait(f'v.revision==={revision+2}')
+        assert nodes()['a']['Bounds']['X'] == 1 and nodes()['b']['Bounds']['X'] == 251
+        undo(sized); undo(baseline)
+        record('The Arrange menu executes the same size command as the toolbar')
+        record('Closing the Arrange menu restores graph keyboard input without an extra pointer click')
         select('a', 'b', 'c'); page.wait_for_timeout(250); builds = arrange()['builds']; click('ZoomIn'); click('ZoomOut'); page.wait_for_timeout(250)
         assert arrange()['builds'] == builds and state()['model'] == baseline
         record('Camera changes do not rebuild selection-aware arrangement availability')
