@@ -67,7 +67,12 @@ with sync_playwright() as p:
         click('PropertyApply'); page.wait_for_timeout(250)
         assert state()['model']==baseline and state()['revision']==revision
         record('Mixed selection shows distinct values without silently applying an initial placeholder')
-        fill('Fill','#DDEFE3'); fill('Width','175.125'); click('PropertyApply'); wait(f'v.revision==={revision+1}')
+        actions = {name: state()['controls'][name] for name in ['PropertyClearText','PropertyApply','PropertyReset']}
+        fill('Fill','#DDEFE3'); fill('Width','175.125')
+        wait('w.inspector.message.startsWith("2 properties staged.")'); page.wait_for_timeout(250)
+        assert all(state()['controls'][name] == box for name,box in actions.items()), 'Feedback moved a pinned action target'
+        record('Pinned action buttons do not move when staging feedback changes height')
+        click('PropertyApply'); wait(f'v.revision==={revision+1}')
         after=state()['model']['Graph']; assert after['Nodes'][0]['Fill']==after['Nodes'][1]['Fill']=='#DDEFE3'
         assert after['Nodes'][0]['Bounds']['Width']==after['Nodes'][1]['Bounds']['Width']==175.125
         assert after['Nodes'][0]['Text']=='Alpha' and after['Nodes'][1]['Text']=='Beta'
@@ -81,7 +86,10 @@ with sync_playwright() as p:
         assert state()['model']==baseline and state()['revision']==revision
         click('PropertyReset')
         record('Invalid geometry rolls back the entire batch, including valid staged styles')
-        click('PropertyClearText'); assert state()['revision']==revision
+        click('PropertyClearText'); wait('w.inspector.message.startsWith("1 properties staged.")')
+        page.wait_for_timeout(250)
+        assert workspace()['inspector']['message'].startswith('1 properties staged.'), 'Clear intent was lost before Apply'
+        assert state()['revision']==revision
         click('PropertyApply'); wait(f'v.revision==={revision+1}')
         assert all(n['Text']=='' for n in state()['model']['Graph']['Nodes'][:2]); undo(baseline)
         record('Explicit clear-text staging applies empty text to a mixed selection with one undo')

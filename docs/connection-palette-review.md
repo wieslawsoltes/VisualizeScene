@@ -72,7 +72,14 @@ repeated value notifications could remove the pending clear. `GraphTextPropertyD
 now retains that intent independently, distinguishes null (unchanged) from empty
 (clear), and preserves no-op/reset semantics. Portable duplicate-notification and exact
 undo regressions accompany the unchanged native clear/undo browser assertion. The
-failed artifact is retained. Successful workflow results, not this inventory, establish
+failed artifact is retained. The subsequent native run still stopped at Clear, so the
+draft fix is not claimed to have resolved that browser failure by itself. Review of the
+pinned footer also found that variable-height feedback moved its button targets: a short
+"Properties applied" message and a multi-line validation/help message shifted the rows
+by more than a button height. Feedback now reserves a fixed 70-unit area. The browser
+checks that the same action rectangles survive changed staging feedback and requires
+explicit clear intent to remain staged before Apply; it neither retries the click nor
+removes exact-undo assertions. Successful workflow results, not this inventory, establish
 which revisions passed.
 
 ## Validation

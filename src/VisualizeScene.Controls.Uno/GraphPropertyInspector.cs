@@ -57,7 +57,8 @@ public sealed partial class GraphPropertyInspector : UserControl, IDisposable
         var scroll = new ScrollViewer { Content = fields, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         Grid.SetRow(scroll, 1); root.Children.Add(scroll);
         commands.Margin = new(0, 7, 0, 0); Grid.SetRow(commands, 2); root.Children.Add(commands);
-        message.MaxHeight = 70; message.Margin = new(0, 5, 0, 0); Grid.SetRow(message, 3); root.Children.Add(message); Content = root;
+        // Keep feedback height constant: changing a validation/staging message must not move click targets.
+        message.Height = 70; message.MaxHeight = 70; message.Margin = new(0, 5, 0, 0); Grid.SetRow(message, 3); root.Children.Add(message); Content = root;
     }
     private void Update(object? sender, EventArgs args) => Refresh();
     private void Rebind(object? sender, GraphDocumentChangedEventArgs args)
