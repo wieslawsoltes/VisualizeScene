@@ -31,6 +31,15 @@ with sync_playwright() as p:
     page = browser.new_page(viewport={'width': 1440, 'height': 1050}, device_scale_factor=1)
     page.add_init_script("Object.defineProperty(window,'showOpenFilePicker',{value:undefined,configurable:true});")
     page.on('pageerror', lambda error: errors.append(str(error)))
+    # Bounded, read-only event evidence distinguishes a canvas click from a dismissing menu overlay.
+    page.add_init_script("""globalThis.orderInputEvents=[];
+        for(const type of ['pointerdown','pointerup','contextmenu']) addEventListener(type,e=>{
+            const target=e.target, v=globalThis.visualizeSceneState;
+            orderInputEvents.push({type,button:e.button,x:e.clientX,y:e.clientY,
+                tag:target?.tagName,classes:String(target?.className??''),
+                revision:v?.revision,focused:v?.graphFocused,context:globalThis.visualizeSceneWorkspace?.contextOpen});
+            if(orderInputEvents.length>80)orderInputEvents.shift();
+        },true);""")
     def state(): return page.evaluate('globalThis.visualizeSceneState')
     def ws(): return page.evaluate('globalThis.visualizeSceneWorkspace')
     def wait(expression):
@@ -43,7 +52,12 @@ with sync_playwright() as p:
         v = state(); return v['canvas']['x'] + (x-v['origin']['x'])*v['zoom'], v['canvas']['y'] + (y-v['origin']['y'])*v['zoom']
     def pick(x, y, ident):
         page.mouse.click(*screen(x, y)); wait('v.selection.length===1 && v.selection[0]==='+json.dumps(ident))
-    def menu(operation): click('MenuArrange'); click('MenuOrder'+operation)
+    def menu(operation):
+        name = 'MenuOrder'+operation
+        click('MenuArrange'); click(name)
+        # A command can publish the new graph before its native flyout finishes dismissing.
+        # Wait for the actual menu item to unload, not an arbitrary extra sleep or a repeated click.
+        wait('!v.controls['+json.dumps(name)+']')
     def undo(expected):
         revision = state()['revision']; click('Undo'); wait(f'v.revision==={revision+1}')
         assert state()['model'] == expected
@@ -129,7 +143,7 @@ with sync_playwright() as p:
         try: page.screenshot(path=str(out/'failure.png'))
         except Exception: pass
     finally:
-        for name, fn in [('state',state),('workspace',ws)]:
+        for name, fn in [('state',state),('workspace',ws),('input-events',lambda: page.evaluate('globalThis.orderInputEvents'))]:
             try: (out/(name+'.json')).write_text(json.dumps(fn(),indent=2))
             except Exception: pass
         (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno, actual input and screenshot pixels. SwiftShader is software rendering.'},indent=2))

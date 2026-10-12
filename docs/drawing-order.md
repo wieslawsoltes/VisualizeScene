@@ -95,3 +95,10 @@ The wider regression suites remain required. This review does not certify a bug-
 toolkit. Full docking/multiple documents, specialized styles, all layout families, complete
 GraphML interchange, printing, graph accessibility peers and physical-GPU/touch/native-GUI
 certification remain additional work.
+
+The first new ordering-browser run passed its initial three cases but did not open the
+context menu when a right click immediately followed an Arrange command. The captured
+state had no application error. The test now waits for the real Arrange flyout item to
+unload before sending the next pointer action; it does not repeat clicks or relax the
+context-menu assertion. A bounded read-only pointer-event trace is retained on failure.
+This synchronization change is distinct from the synchronous command-state source fix.
