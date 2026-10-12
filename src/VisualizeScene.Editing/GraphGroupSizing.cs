@@ -86,7 +86,19 @@ public static class GraphGroupSizing
             {
                 cancellationToken.ThrowIfCancellationRequested(); examinedLabels++;
                 var owner = index.Ports.TryGetValue(label.OwnerId, out var port) ? port.NodeId : label.OwnerId;
-                if (!index.Nodes.ContainsKey(owner) || !index.IsVisible(owner)) continue;
+                if (!index.Nodes.TryGetValue(owner, out var ownerNode) || !index.IsVisible(owner)) continue;
+                // Only strict descendants influence a selected frame. Reuse the ancestry memo
+                // from root discovery; top-level unrelated labels need no per-owner storage.
+                var parent = ownerNode.ParentId; var included = false; ancestry.Clear();
+                while (parent is not null)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (selected.Contains(parent)) { included = true; break; }
+                    if (memo.TryGetValue(parent, out included)) break;
+                    ancestry.Add(parent); parent = index.Nodes[parent].ParentId;
+                }
+                foreach (var ancestor in ancestry) memo[ancestor] = included;
+                if (!included) continue;
                 if (!labels.TryGetValue(owner, out var list)) labels.Add(owner, list = []);
                 list.Add(label);
             }
