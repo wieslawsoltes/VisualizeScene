@@ -29,6 +29,8 @@ public sealed partial class GraphRenderer : IDisposable
     private readonly SKTypeface typeface;
     private readonly bool ownsTypeface;
     private readonly SKShaper shaper;
+    private readonly EdgeStyleRenderer edgePainter = new();
+    public int CachedEdgeDashEffects => edgePainter.CachedDashEffects;
     private readonly SKPaint paint = new() { IsAntialias = true };
     private bool disposed;
     public RenderStatistics Statistics { get; private set; } = new(0, 0, 0, 0);
@@ -75,6 +77,7 @@ public sealed partial class GraphRenderer : IDisposable
                 if (!GraphScene.IsEdgeVisible(index, edge))
                 { if (edges.Remove(edge.Id, out var hidden)) { hidden.Path.Dispose(); routesChanged = true; } continue; }
                 edges.TryGetValue(edge.Id, out var old);
+                if (old is not null && !SameEdgeBounds(old.Edge, edge)) routesChanged = true;
                 // Paint order and style metadata do not change routes or their spatial bounds.
                 var points = !geometryChanged && old is not null && SameEdgeGeometry(old.Edge, edge) ? old.Points : index.EdgePath(edge);
                 if (old is not null && old.Points.SequenceEqual(points))
@@ -85,12 +88,13 @@ public sealed partial class GraphRenderer : IDisposable
             }
             if (routesChanged || previous is null)
             {
-                edgeIndex = new(snapshot.Edges.Where(e => edges.ContainsKey(e.Id)).Select(e => (RectD.Enclose(edges[e.Id].Points.Select(p => new RectD(p.X, p.Y, 0, 0))).Inflate(14), e.Id)));
+                edgeIndex = new(snapshot.Edges.Where(e => edges.ContainsKey(e.Id)).Select(e => (EdgeVisualBounds(edges[e.Id]), e.Id)));
                 edgeIndexBuilds++;
             }
         }
         if (previous is null || geometryChanged || edgeGeometryChanged || previous.Labels != snapshot.Labels)
         { PrepareAnnotations(snapshot); annotationIndexBuilds++; }
+        PrepareEdgeCaptions(snapshot, previous, previousIndex, edgeGeometryChanged);
         graph = snapshot;
     }
     public void Render(SKCanvas canvas, GraphSnapshot snapshot, Viewport viewport, double width, double height, RenderOptions? options = null)
@@ -99,6 +103,7 @@ public sealed partial class GraphRenderer : IDisposable
         var zoom = viewport.Zoom; var origin = viewport.Origin; var view = new RectD(origin.X, origin.Y, width / zoom, height / zoom).Inflate(20 / zoom);
         visibleNodeIds.Clear(); visibleEdgeIds.Clear(); visibleGroups.Clear(); visibleNodes.Clear();
         var nodeQuery = nodeIndex.Query(view, visibleNodeIds); var edgeQuery = edgeIndex.Query(view, visibleEdgeIds);
+        var captionExamined = QueryEdgeCaptions(view, zoom, options.Overview);
         foreach (var id in visibleNodeIds)
         {
             var node = index!.Nodes[id];
@@ -108,7 +113,7 @@ public sealed partial class GraphRenderer : IDisposable
         visibleNodes.Sort((a, b) => order[a.Id].CompareTo(order[b.Id]));
         visibleGroups.Sort((a, b) => { var c = depths[a.Id].CompareTo(depths[b.Id]); return c != 0 ? c : order[a.Id].CompareTo(order[b.Id]); });
         visibleLabels.Clear(); visiblePorts.Clear();
-        frameLabels = framePorts = frameAdorners = 0; examinedItems = nodeQuery.ExaminedEntries + edgeQuery.ExaminedEntries;
+        frameLabels = framePorts = frameAdorners = 0; examinedItems = nodeQuery.ExaminedEntries + edgeQuery.ExaminedEntries + captionExamined;
         var save = canvas.Save();
         try
         {
@@ -144,8 +149,8 @@ public sealed partial class GraphRenderer : IDisposable
     {
         if (disposed) return; disposed = true;
         DisposePictures(); foreach (var edge in edges.Values) edge.Path.Dispose(); edges.Clear();
-        paint.Dispose(); shaper.Dispose(); if (ownsTypeface) typeface.Dispose();
+        edgePainter.Dispose(); paint.Dispose(); shaper.Dispose(); if (ownsTypeface) typeface.Dispose();
         graph = null; index = null; measuredLabels.Clear(); ClearAnnotationCache(); visibleNodeIds.Clear(); visibleEdgeIds.Clear(); visibleNodes.Clear(); visibleGroups.Clear();
-        nodeIndex = new([]); edgeIndex = new([]); order.Clear(); depths.Clear();
+        nodeIndex = new([]); edgeIndex = new([]); ClearEdgeCaptions(); order.Clear(); depths.Clear();
     }
 }

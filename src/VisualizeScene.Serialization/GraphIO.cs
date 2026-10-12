@@ -104,6 +104,7 @@ public static partial class GraphIO
                 var bends = item.Descendants().Where(e => e.Name.LocalName == "Point").Select(p => new PointD(Number((string?)p.Attribute("x"), 0), Number((string?)p.Attribute("y"), 0))).ToImmutableArray();
                 var label = item.Descendants().FirstOrDefault(e => e.Name.LocalName == "EdgeLabel")?.Value ?? Data(item, "label") ?? "";
                 edge = new(id, source, target, label, Number(Data(item, "weight"), 1), bends, Directed: directed);
+                edge = LegacyEdgeStyle(item, edge, diagnostics);
             }
             var sp = (string?)item.Attribute("sourceport"); var tp = (string?)item.Attribute("targetport");
             edge = edge with { Id = id, SourceId = source, TargetId = target,

@@ -58,6 +58,7 @@ public static class GraphScene
     {
         var path = index.EdgePath(edge);
         for (var i = 0; i < path.Count; i++) { var p = path[i]; bounds.Add(new(p.X, p.Y, 0, 0)); }
+        if (edge.Style is not null) bounds.Add(EdgeGeometry.Bounds(edge, path));
         if (edge.Text.Length == 0) return;
         var caption = new GraphLabel("", edge.Id, edge.Text, new(0, -9), 11);
         bounds.Add(LabelBounds(index, caption, measure(caption)));

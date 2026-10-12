@@ -61,16 +61,7 @@ public sealed partial class GraphRenderer
     private void DrawEdge(SKCanvas canvas, EdgePicture edge, double zoom, RenderOptions options)
     {
         var selected = options.Selection?.Contains(edge.Edge.Id) == true;
-        Use(selected ? new SKColor(0, 112, 215) : SKColor.Parse(edge.Edge.Stroke), SKPaintStyle.Stroke, selected ? (float)(2.5 / zoom) : 1.5f); canvas.DrawPath(edge.Path, paint);
-        if (edge.Edge.Directed && edge.Points.Count >= 2)
-        {
-            var end = edge.Points[^1]; var previous = edge.Points.Reverse().Skip(1).FirstOrDefault(p => PointD.Distance(p, end) > .001, edge.Points[0]); var delta = end - previous; var length = delta.Length;
-            if (length > .001)
-            {
-                var unit = delta * (1 / length); var normal = new PointD(-unit.Y, unit.X); var tipSize = options.Overview ? 5 : 8;
-                using var arrow = new SKPath(); arrow.MoveTo(Point(end)); arrow.LineTo(Point(end - unit * tipSize + normal * (tipSize * .45))); arrow.LineTo(Point(end - unit * tipSize - normal * (tipSize * .45))); arrow.Close(); paint.Style = SKPaintStyle.Fill; canvas.DrawPath(arrow, paint);
-            }
-        }
+        edgePainter.Draw(canvas, edge.Edge, edge.Points, edge.Path, zoom, selected, options.Overview);
         if (!options.Overview && zoom >= .35 && edge.Edge.Text.Length > 0)
         {
             var position = Geometry.PointAtFraction(edge.Points, .5); DrawText(canvas, edge.Edge.Text, position + new PointD(0, -9), 11, 220, 50, true);
