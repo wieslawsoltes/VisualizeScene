@@ -11,6 +11,7 @@ static class EdgeWorkflowTests
     }
     public static void Run(Action<string,Action> test)
     {
+        TextDraftTests.Run(test);
         test("Edge UI contracts: creation defaults affect new edges only and retain one-step undo", () => {
             var d=Document(); var original=d.Snapshot; using var s=new EditorSession(d);
             s.EdgeDefaults=new(EdgeRouting.Polyline,"#112233",new(3,EdgeDash.DashDot,EdgeArrow.HollowDiamond,EdgeArrow.Open));
