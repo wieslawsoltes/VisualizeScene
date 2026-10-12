@@ -81,7 +81,8 @@ public sealed partial class GraphPropertyInspector : UserControl, IDisposable
     {
         var input = new ComboBox { ItemsSource = Enum.GetValues<T>(), SelectedItem = selected, FontSize = 11, MinHeight = 26,
             Padding = new(3, 2, 3, 2), BorderThickness = new(0), CornerRadius = new(0), HorizontalAlignment = HorizontalAlignment.Stretch };
-        Register(name, input); fields.AddProperty(name, input); return input;
+        var caption = name switch { "LinePattern" => "Line pattern", "SourceArrow" => "Source arrow", "TargetArrow" => "Target arrow", _ => name };
+        Register(name, input); fields.AddProperty(caption, input); return input;
     }
     private CheckBox Check(string name, string label, bool value)
     {
