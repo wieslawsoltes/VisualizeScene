@@ -133,4 +133,7 @@ with sync_playwright() as p:
         except Exception: pass
         (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno, native pointer/keyboard input. SwiftShader software rendering; not physical GPU evidence.'},indent=2))
         browser.close()
-sys.exit(1 if errors else 0)
+if errors:
+    sys.exit(1)
+import subprocess
+sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("group_sizing.py")), url], check=False).returncode)

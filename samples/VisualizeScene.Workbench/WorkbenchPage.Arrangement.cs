@@ -26,7 +26,7 @@ public sealed partial class WorkbenchPage
     {
         foreach (var command in Enum.GetValues<GraphArrangeCommand>())
         {
-            if (command is GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.SameWidth) menu.Items.Add(new MenuFlyoutSeparator());
+            if (command is GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.SameWidth or GraphArrangeCommand.FitGroups) menu.Items.Add(new MenuFlyoutSeparator());
             var item = new MenuFlyoutItem { Text = GraphArrangeToolbar.Caption(command), IsEnabled = false };
             Register("MenuArrange" + command, item);
             item.Click += (_, _) => Run(() => { graph.ArrangeNodes(command); ReturnSelectionFocus(menu, item); });

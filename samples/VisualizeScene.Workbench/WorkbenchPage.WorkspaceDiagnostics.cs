@@ -44,7 +44,7 @@ public sealed partial class WorkbenchPage
         var focused = new[] { "Label", "Text", "X", "Y", "Width", "Height", "Fill", "Stroke", "LineWidth", "FontSize", "OffsetX", "OffsetY", "RelativeX", "RelativeY", "Weight" }
             .FirstOrDefault(name => inspector.FindPropertyEditor(name) is Control input && input.FocusState != FocusState.Unfocused);
         var inspectorState = $"{{choices:{{{choices}}},focused:{(focused is null ? "null" : Q(focused))},batchCount:{inspector.BatchItemCount},batchExamined:{inspector.BatchExaminedItems},text:{{{editorText}}},count:{inspector.PropertyCount},geometryExpanded:{(inspector.IsPropertyGroupExpanded("Geometry") ? "true" : "false")},message:{Q(inspector.MessageText)}}}";
-        foreach (var name in new[] { "EditLabel", "AddLabel", "AddPort", "Copy", "Cut", "Paste", "Duplicate", "Delete", "Group", "Ungroup", "Fold", "CreateNode", "SelectAll", "Fit", "OrderBringToFront", "OrderSendToBack", "OrderRaise", "OrderLower" })
+        foreach (var name in new[] { "EditLabel", "AddLabel", "AddPort", "Copy", "Cut", "Paste", "Duplicate", "Delete", "Group", "Ungroup", "Fold", "FitGroups", "CreateNode", "SelectAll", "Fit", "OrderBringToFront", "OrderSendToBack", "OrderRaise", "OrderLower" })
         {
             var key = "Context" + name;
             if (graph.IsContextMenuOpen && graph.FindContextCommand(name) is { } command) testControls[key] = command; else testControls.Remove(key);
