@@ -66,6 +66,7 @@ public sealed partial class GraphControl
         Item("Fold", "Fold / unfold", () => owner.Edit("Fold selected groups", edit =>
         { foreach (var group in groups) edit.Update(group with { Collapsed = !group.Collapsed }); }, revision), groups.Length > 0);
         Item("FitGroups", "Fit groups to children", () => ArrangeNodes(GraphArrangeCommand.FitGroups), groups.Any(n => GraphGroupSizing.CanFit(index, n)));
+        Item("EnlargeGroups", "Enlarge groups to children", () => ArrangeNodes(GraphArrangeCommand.EnlargeGroups), groups.Any(n => GraphGroupSizing.CanFit(index, n)));
         menu.Items.Add(new MenuFlyoutSeparator());
         foreach (var operation in Enum.GetValues<DrawingOrder>())
             Item("Order" + operation, GraphOrderToolbar.Caption(operation), () => ChangeDrawingOrder(operation), selected.Any(id => !index.Ports.ContainsKey(id)));

@@ -9,8 +9,10 @@ public static class GroupSizingApi
     public static void Verify(GraphControl graph, GraphArrangeToolbar toolbar)
     {
         _ = toolbar.FindButton(GraphArrangeCommand.FitGroups);
+        _ = toolbar.FindButton(GraphArrangeCommand.EnlargeGroups);
         _ = GraphArrangeToolbar.CanExecute(GraphArrangeCommand.FitGroups, toolbar.State);
         _ = new GroupSizingOptions(Padding: 12, HeaderHeight: 28, EnlargeOnly: true);
         graph.ArrangeNodes(GraphArrangeCommand.FitGroups);
+        graph.ArrangeNodes(GraphArrangeCommand.EnlargeGroups);
     }
 }
