@@ -34,6 +34,15 @@ public sealed partial class EditorSession
         portOrder = Document.Snapshot.Ports.Select((p, i) => (p.Id, i)).ToDictionary(p => p.Id, p => p.i, StringComparer.Ordinal);
         labelOrder = Document.Snapshot.Labels.Select((l, i) => (l.Id, i)).ToDictionary(p => p.Id, p => p.i, StringComparer.Ordinal);
     }
+    // Shared by the picking broad phase and keyboard focus. Unstyled paths retain legacy centerline bounds.
+    private RectD EdgeInteractionBounds(string id)
+    {
+        var route = paths[id]; var edge = index.Edges[id];
+        if (edge.Style is not null) return EdgeGeometry.Bounds(edge, route);
+        var bounds = new RectD(route[0].X, route[0].Y, 0, 0);
+        for (var i = 1; i < route.Count; i++) bounds = RectD.Union(bounds, new(route[i].X, route[i].Y, 0, 0));
+        return bounds;
+    }
     private void QueryHitCandidates(PointD world, double tolerance)
     {
         LastHandleCandidateCount = 0;
@@ -102,11 +111,7 @@ public sealed partial class EditorSession
         var normal = HitNode(world, groupOnly: false); if (normal is not null) return new(HitKind.Node, normal.Id);
         hitEdges.Sort((a, b) => edgeOrder[b].CompareTo(edgeOrder[a]));
         foreach (var id in hitEdges)
-        {
-            var points = paths[id];
-            for (var i = 1; i < points.Count; i++)
-                if (Geometry.DistanceToSegment(world, points[i - 1], points[i]) <= tolerance) return new(HitKind.Edge, id);
-        }
+            if (EdgeGeometry.Hit(index.Edges[id], paths[id], world, tolerance)) return new(HitKind.Edge, id);
         var group = HitNode(world, groupOnly: true);
         return group is null ? new(HitKind.None) : new(HitKind.Node, group.Id);
     }

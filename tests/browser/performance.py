@@ -92,7 +92,7 @@ with sync_playwright() as p:
         record("Select-all rendering is viewport-bounded with a finite native picture budget")
         page.wait_for_function("() => globalThis.visualizeSceneWorkspace?.inspector.batchCount === 39900", timeout=45000)
         properties = page.evaluate("globalThis.visualizeSceneWorkspace.inspector")
-        assert properties["batchExamined"] == 39900 and properties["count"] <= 11
+        assert properties["batchExamined"] == 39900 and properties["count"] == 15
         record("Mixed property summary examines each selected item once with a fixed number of editors")
         page.keyboard.press("Delete")
         wait("v.model.Graph.Nodes.length === 0 && v.performance.retainedPictures === 0")

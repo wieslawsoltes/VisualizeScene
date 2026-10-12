@@ -24,7 +24,7 @@ public sealed partial class EditorSession
             return node.IsGroup && !node.Collapsed ? new(node.Bounds.X, node.Bounds.Y, node.Bounds.Width, Math.Min(28, node.Bounds.Height)) : node.Bounds;
         if (index.Ports.ContainsKey(id)) { var p = index.PortLocation(id); var r = 3.5 / Viewport.Zoom; return new(p.X - r, p.Y - r, r * 2, r * 2); }
         if (index.Labels.TryGetValue(id, out var label)) return GetLabelBounds(label);
-        return RectD.Enclose(paths[id].Select(p => new RectD(p.X, p.Y, 0, 0)));
+        return EdgeInteractionBounds(id);
     }
     public bool FocusItem(string? id)
     {

@@ -129,11 +129,7 @@ public sealed partial class EditorSession
             }
         if (kinds.HasFlag(SelectionKinds.Edges))
             foreach (var id in edgeIndex.Query(rectangle))
-            {
-                var path = paths[id];
-                if (contain ? path.All(rectangle.Contains) : Enumerable.Range(1, path.Count - 1)
-                    .Any(i => Geometry.RectangleIntersectsSegment(rectangle, path[i - 1], path[i]))) result.Add(id);
-            }
+                if (EdgeGeometry.MatchesArea(index.Edges[id], paths[id], rectangle, contain)) result.Add(id);
         if (kinds.HasFlag(SelectionKinds.Ports))
         {
             var radius = 3.5 / Viewport.Zoom;

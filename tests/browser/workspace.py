@@ -107,4 +107,7 @@ if batch_result:
 order_result = subprocess.run([sys.executable, str(Path(__file__).with_name("order.py")), url], check=False).returncode
 if order_result:
     sys.exit(order_result)
-sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("scrolling.py")), url], check=False).returncode)
+scroll_result = subprocess.run([sys.executable, str(Path(__file__).with_name("scrolling.py")), url], check=False).returncode
+if scroll_result:
+    sys.exit(scroll_result)
+sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("edge_styles.py")), url], check=False).returncode)

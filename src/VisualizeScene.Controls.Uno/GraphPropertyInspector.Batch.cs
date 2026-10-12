@@ -56,11 +56,17 @@ public sealed partial class GraphPropertyInspector
         if (captured.Text.Count > 0)
         {
             fields.AddGroup("Label");
-            var input = Text("Label", Caption("Text", captured.Text.Count), captured.Text.IsMixed ? "" : captured.Text.Value, true);
+            var draft = new GraphTextPropertyDraft(captured.Text);
+            var input = Text("Label", Caption("Text", captured.Text.Count), draft.Text, true);
             input.PlaceholderText = "Multiple values";
-            input.TextChanged += (_, _) => Pending("Text", input.Text == (captured.Text.IsMixed ? "" : captured.Text.Value) ? null : patch => patch with { Text = input.Text });
-            // Explicit empty text is useful even when the mixed-value placeholder is already empty.
-            Command("ClearText", "Clear selected text", () => { input.Text = ""; Pending("Text", patch => patch with { Text = "" }); }, reportApplied: false);
+            void StageText()
+            {
+                var replacement = draft.Replacement;
+                Pending("Text", replacement is null ? null : patch => patch with { Text = replacement });
+            }
+            input.TextChanged += (_, _) => { draft.SetText(input.Text); StageText(); };
+            // Keep explicit clear intent separate from the empty mixed-value placeholder.
+            Command("ClearText", "Clear selected text", () => { draft.Clear(); input.Text = draft.Text; StageText(); }, reportApplied: false);
             Number("FontSize", "Font size", captured.FontSize, (p, v) => p with { FontSize = v });
         }
         if (captured.Stroke.Count > 0)
@@ -78,6 +84,14 @@ public sealed partial class GraphPropertyInspector
             Number("Width", "Width", captured.Width, (p, v) => p with { Width = v });
             Number("Height", "Height", captured.Height, (p, v) => p with { Height = v });
             Boolean("Locked", "Lock position", captured.Locked, (p, v) => p with { Locked = v });
+        }
+        if (captured.EdgeCount > 0)
+        {
+            fields.AddGroup("Line style");
+            Number("LineWidth", "Line width", captured.LineWidth, (p, v) => p with { LineWidth = v });
+            EnumField("LinePattern", captured.LinePattern, (p, v) => p with { LinePattern = v });
+            EnumField("SourceArrow", captured.SourceArrow, (p, v) => p with { SourceArrow = v });
+            EnumField("TargetArrow", captured.TargetArrow, (p, v) => p with { TargetArrow = v });
         }
         if (captured.Weight.Count > 0)
         {

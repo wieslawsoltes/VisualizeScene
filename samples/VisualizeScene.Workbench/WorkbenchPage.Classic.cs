@@ -62,7 +62,13 @@ public sealed partial class WorkbenchPage
         var flowchart = new EditorPane { Title = "Flowchart", PaneContent = palette }; Register("FlowchartCollapse", flowchart.CollapseButton); catalog.Children.Add(flowchart);
         var edgeTools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, Padding = new(7) };
         edgeTools.Children.Add(IconButton(EditorIconKind.Edge, "PaletteEdge", "Draw connection", () => SetMode(EditorMode.CreateEdge)));
-        edgeTools.Children.Add(Button("Route edges", "PaletteRoute", () => _ = RouteEdges())); catalog.Children.Add(new EditorPane { Title = "Connections", PaneContent = edgeTools });
+        edgeTools.Children.Add(Button("Route edges", "PaletteRoute", () => _ = RouteEdges()));
+        var connections = new StackPanel { Spacing = 3 }; var edgePalette = new EdgePalette { Target = graph, Margin = new(4) };
+        for (var i = 0; i < edgePalette.Items.Count; i++) if (edgePalette.GetTemplateButton(i) is { } button) Register("EdgeTemplate" + i, button);
+        edgePalette.Error += (_, error) => Report(error);
+        edgePalette.TemplateSelected += (_, template) => { status.Text = template.Name + ": click source, then target."; UpdateChrome(); PublishTestState(); };
+        connections.Children.Add(edgePalette); connections.Children.Add(edgeTools);
+        catalog.Children.Add(new EditorPane { Title = "Connections", PaneContent = connections });
         var groupTools = new StackPanel { Spacing = 5, Padding = new(6) };
         groupTools.Children.Add(Button("Group selected nodes", "PaletteGroup", graph.Session.Group)); groupTools.Children.Add(Button("Ungroup", "PaletteUngroup", graph.Session.Ungroup)); catalog.Children.Add(new EditorPane { Title = "Groups", PaneContent = groupTools });
         catalog.Children.Add(new TextBlock { Text = "Choose a shape, then click the diagram.\nDrag nodes to move. Double-click to edit.", FontSize = 10, TextWrapping = TextWrapping.Wrap, Margin = new(5), Foreground = Brush("#536171") });

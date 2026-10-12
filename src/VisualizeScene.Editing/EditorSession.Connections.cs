@@ -68,7 +68,8 @@ public sealed partial class EditorSession
         var edgeId = GraphEdit.NewId("e");
         CancelGesture(false);
         Document.Edit("Create edge", edit => edit.Add(new GraphEdge(edgeId, request.Source.NodeId, request.Target.NodeId,
-            Bends: [], SourcePortId: request.Source.PortId, TargetPortId: request.Target.PortId)));
+            Bends: [], Stroke: edgeDefaults.Stroke, Routing: edgeDefaults.Routing,
+            SourcePortId: request.Source.PortId, TargetPortId: request.Target.PortId) { Style = edgeDefaults.Style }));
         Select([edgeId]);
     }
 

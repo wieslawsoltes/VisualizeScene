@@ -7,11 +7,20 @@ namespace VisualizeScene.Workbench;
 
 public sealed partial class WorkbenchPage
 {
+    private void RefreshPropertyDiagnostics()
+    {
+        foreach (var name in new[] { "Label", "Text", "X", "Y", "Width", "Height", "Shape", "Fill", "Stroke", "FillPalette", "StrokePalette", "FillSwatchFFCC66", "FillSwatchDDEFE3", "OffsetX", "OffsetY", "FontSize", "RelativeX", "RelativeY", "Locked", "GroupGeometry", "GroupAppearance", "Apply", "Reset", "ClearText", "Directed", "Weight", "Routing", "LineWidth", "LinePattern", "SourceArrow", "TargetArrow" })
+        {
+            var key = "Property" + name;
+            if (inspector.FindPropertyEditor(name) is { } editor) testControls[key] = editor; else testControls.Remove(key);
+        }
+    }
     private void PublishWorkspaceState()
     {
 #if __WASM__
         if (!DiagnosticsEnabled || !ready) return;
         PublishScrollState();
+        RefreshPropertyDiagnostics();
         static string N(double n) => double.IsFinite(n) ? n.ToString("R", CultureInfo.InvariantCulture) : "0";
         static string Q(string s) => "\"" + JsonEncodedText.Encode(s).ToString() + "\"";
         string Bounds(FrameworkElement e)
@@ -24,13 +33,10 @@ public sealed partial class WorkbenchPage
             }
             catch { return "null"; }
         }
-        foreach (var name in new[] { "Label", "Text", "X", "Y", "Width", "Height", "Shape", "Fill", "Stroke", "FillPalette", "StrokePalette", "FillSwatchFFCC66", "FillSwatchDDEFE3", "OffsetX", "OffsetY", "FontSize", "RelativeX", "RelativeY", "Locked", "GroupGeometry", "GroupAppearance", "Apply", "Reset", "ClearText", "Directed", "Weight", "Routing" })
-        {
-            var key = "Property" + name;
-            if (inspector.FindPropertyEditor(name) is { } editor) testControls[key] = editor; else testControls.Remove(key);
-        }
-        var editorText = string.Join(",", new[] { "Label", "Fill", "Stroke", "Width", "Height", "FontSize", "Weight" }.Select(name => (Name: name, Editor: inspector.FindPropertyEditor(name))).Where(pair => pair.Editor is TextBox).Select(pair => Q(pair.Name) + ":" + Q(((TextBox)pair.Editor!).Text)));
-        var inspectorState = $"{{batchCount:{inspector.BatchItemCount},batchExamined:{inspector.BatchExaminedItems},text:{{{editorText}}},count:{inspector.PropertyCount},geometryExpanded:{(inspector.IsPropertyGroupExpanded("Geometry") ? "true" : "false")},message:{Q(inspector.MessageText)}}}";
+        var editorText = string.Join(",", new[] { "Label", "Fill", "Stroke", "Width", "Height", "FontSize", "Weight", "LineWidth" }.Select(name => (Name: name, Editor: inspector.FindPropertyEditor(name))).Where(pair => pair.Editor is TextBox).Select(pair => Q(pair.Name) + ":" + Q(((TextBox)pair.Editor!).Text)));
+        var focused = new[] { "Label", "Text", "X", "Y", "Width", "Height", "Fill", "Stroke", "LineWidth", "FontSize", "OffsetX", "OffsetY", "RelativeX", "RelativeY", "Weight" }
+            .FirstOrDefault(name => inspector.FindPropertyEditor(name) is Control input && input.FocusState != FocusState.Unfocused);
+        var inspectorState = $"{{focused:{(focused is null ? "null" : Q(focused))},batchCount:{inspector.BatchItemCount},batchExamined:{inspector.BatchExaminedItems},text:{{{editorText}}},count:{inspector.PropertyCount},geometryExpanded:{(inspector.IsPropertyGroupExpanded("Geometry") ? "true" : "false")},message:{Q(inspector.MessageText)}}}";
         foreach (var name in new[] { "EditLabel", "AddLabel", "AddPort", "Copy", "Cut", "Paste", "Duplicate", "Delete", "Group", "Ungroup", "Fold", "CreateNode", "SelectAll", "Fit", "OrderBringToFront", "OrderSendToBack", "OrderRaise", "OrderLower" })
         {
             var key = "Context" + name;
