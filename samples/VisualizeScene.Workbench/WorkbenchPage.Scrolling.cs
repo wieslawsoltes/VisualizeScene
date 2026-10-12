@@ -28,6 +28,7 @@ public sealed partial class WorkbenchPage
     {
 #if __WASM__
         if (!DiagnosticsEnabled || scrollViewer is null) return;
+        PublishArrangementState();
         static string N(double v) => double.IsFinite(v) ? v.ToString("R", CultureInfo.InvariantCulture) : "0";
         static string Axis(ViewportScrollAxis a) => $"{{min:{N(a.MinimumOrigin)},max:{N(a.MaximumOrigin)},origin:{N(a.Origin)},value:{N(a.Value)},page:{N(a.ViewportSize)},small:{N(a.SmallChange)},large:{N(a.LargeChange)},enabled:{(a.CanScroll ? "true" : "false")}}}";
         foreach (var (name, horizontal) in new[] { ("GraphHThumb", true), ("GraphVThumb", false) })

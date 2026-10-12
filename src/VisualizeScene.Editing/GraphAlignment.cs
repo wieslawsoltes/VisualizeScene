@@ -52,13 +52,13 @@ public static class GraphAlignment
         var bounds = RectD.Enclose(roots.Select(n => n.Bounds));
         var vertical = alignment == Alignment.DistributeVertical;
         var distribute = alignment is Alignment.DistributeHorizontal or Alignment.DistributeVertical;
+        var gap = distribute ? ((vertical ? bounds.Height : bounds.Width) - roots.Sum(n => vertical ? n.Bounds.Height : n.Bounds.Width)) / (roots.Count - 1) : 0;
         // Alignment does not depend on sorted order; distribution retains the existing ordinal tie break.
         if (distribute) roots.Sort((a, b) =>
         {
             var comparison = (vertical ? a.Bounds.Y : a.Bounds.X).CompareTo(vertical ? b.Bounds.Y : b.Bounds.X);
             return comparison != 0 ? comparison : StringComparer.Ordinal.Compare(a.Id, b.Id);
         });
-        var gap = distribute ? ((vertical ? bounds.Height : bounds.Width) - roots.Sum(n => vertical ? n.Bounds.Height : n.Bounds.Width)) / (roots.Count - 1) : 0;
         var cursor = vertical ? bounds.Y : bounds.X;
         var deltas = new Dictionary<string, PointD>(roots.Count, StringComparer.Ordinal);
         foreach (var node in roots)
