@@ -98,9 +98,12 @@ with sync_playwright() as p:
         with page.expect_download() as pending:click('Save')
         saved=out/'fitted.json';pending.value.save_as(str(saved));assert json.loads(saved.read_text())==fitted_model
         wait("!w.documentTitle.endsWith('*')")
+        import_revision=state()['revision']
         with page.expect_file_chooser() as chooser:click('Open')
         chooser.value.set_files(str(saved));wait("v.status==='Graph imported.' && v.selection.length===0 && !w.enabled.ArrangeFitGroups")
-        assert state()['model']==fitted_model
+        assert state()['model']==fitted_model and state()['revision']==import_revision
+        wait("v.navigationFocus===null && v.mode==='Select' && !w.enabled.Delete && !w.enabled.Copy && !w.enabled.Cut && !w.enabled.ArrangeSameSize")
+        record('Identical-file import clears selection, keyboard focus and command state without adding history')
         record('Narrow-window fitting and the real JSON save/import preserve every adjusted frame and dependent item')
         assert not errors,errors
     except Exception:
