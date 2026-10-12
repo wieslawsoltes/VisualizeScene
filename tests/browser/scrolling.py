@@ -107,6 +107,8 @@ with sync_playwright() as p:
         b=bounds('GraphVScroll');assert b['x']+b['width']<=640
         page.screenshot(path=str(out/'narrow-scrollbars.png'));page.set_viewport_size({'width':1440,'height':1050});page.wait_for_timeout(200)
         record('Scrollbar chrome remains usable with responsive side panes hidden')
+        import selection_zoom
+        selection_zoom.run(page,state,wait,click,record,out)
         load(empty);wait('v.model.Graph.Nodes.length===0 && !s.horizontal.enabled && !s.vertical.enabled')
         baseline=state()['model'];revision=state()['revision'];click('GraphScrollFit')
         record('Empty document replacement clears stale ranges and disables inapplicable scrolling')

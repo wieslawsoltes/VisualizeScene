@@ -12,6 +12,8 @@ public static class ScrollApi
         var model = ViewportScrollModel.Calculate(unparentedGraph.ContentBounds, unparentedGraph.Session.Viewport.State, 800, 600);
         _ = model.Horizontal.GetOrigin(.5); _ = viewer.HorizontalBar; _ = viewer.VerticalBar; _ = viewer.FitButton;
         _ = viewer.FindThumb(true); viewer.ScrollBarsVisible = false; viewer.ScrollBarsVisible = true;
+        _ = unparentedGraph.FitSelection();
+        _ = GraphScene.BoundsForItems(unparentedGraph.Document.Snapshot, unparentedGraph.Session.Selection, unparentedGraph.MeasureLabel);
         return viewer;
     }
 }

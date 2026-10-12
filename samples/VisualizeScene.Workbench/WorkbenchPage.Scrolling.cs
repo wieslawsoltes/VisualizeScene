@@ -18,6 +18,7 @@ public sealed partial class WorkbenchPage
     }
     private void AddScrollMenu(MenuBar menu)
     {
+        AddSelectionNavigation(menu);
         var item = new ToggleMenuFlyoutItem { Text = "Canvas scrollbars", IsChecked = true };
         Register("ToggleCanvasScrollbars", item);
         item.Click += (_, _) => { if (scrollViewer is not null) scrollViewer.ScrollBarsVisible = item.IsChecked; };
