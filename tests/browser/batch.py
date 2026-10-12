@@ -47,7 +47,10 @@ with sync_playwright() as p:
         wait('v.selection.length==='+str(len(ids))+' && '+json.dumps(list(ids))+'.every(id=>v.selection.includes(id))')
         wait('w.inspector.batchCount==='+str(len(ids) if len(ids)>1 else 0))
     def fill(name,text):
-        click('Property'+name); page.keyboard.press('Control+a'); page.keyboard.insert_text(text)
+        click('Property'+name)
+        wait('w.inspector.focused==='+json.dumps(name))
+        page.keyboard.press('Control+a'); page.keyboard.insert_text(text)
+        wait('w.inspector.text['+json.dumps(name)+']==='+json.dumps(text))
     def undo(baseline):
         revision=state()['revision']; click('Undo'); wait(f'v.revision==={revision+1}')
         assert state()['model']==baseline
@@ -87,7 +90,7 @@ with sync_playwright() as p:
         assert state()['model']==baseline and state()['revision']==revision
         click('PropertyReset')
         record('A locked selected node rejects a resize and prevents partial style updates')
-        click('ModeSelect'); page.keyboard.press('Control+a'); wait('w.inspector.batchCount===9 && w.inspector.count===11')
+        click('ModeSelect'); page.keyboard.press('Control+a'); wait('w.inspector.batchCount===9 && w.inspector.count===15')
         click('TabStructure'); wait("w.leftTab==='Structure'")
         builds=workspace()['structure']['builds']; revision=state()['revision']
         fill('FontSize','22'); click('PropertyApply'); wait(f'v.revision==={revision+1}')
