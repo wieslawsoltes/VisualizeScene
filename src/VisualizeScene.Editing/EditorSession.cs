@@ -65,7 +65,7 @@ public sealed partial class EditorSession : IDisposable
         index = Document.Snapshot.Index();
         nodeIndex = new(Document.Snapshot.Nodes.Where(n => index.IsVisible(n.Id)).Select(n => (n.Bounds, n.Id)));
         paths = Document.Snapshot.Edges.Where(e => GraphScene.IsEdgeVisible(index, e)).ToDictionary(e => e.Id, index.EdgePath);
-        edgeIndex = new(paths.Select(p => (RectD.Enclose(p.Value.Select(v => new RectD(v.X, v.Y, 0, 0))).Inflate(1), p.Key)));
+        edgeIndex = new(paths.Keys.Select(id => (EdgeInteractionBounds(id).Inflate(1), id)));
         ReindexLabels(); ReindexSelection(); ReindexHitOrder(); itemSnaps = new(Document.Snapshot);
     }
     public void Invalidate() => Invalidated?.Invoke(this, EventArgs.Empty);

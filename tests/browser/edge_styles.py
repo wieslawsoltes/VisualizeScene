@@ -108,6 +108,20 @@ with sync_playwright() as p:
         undo(batch_before)
         record('Mixed edge selection changes width only and preserves each distinct line pattern')
         page.screenshot(path=str(out/'mixed-edge-styles.png'))
+        # Probe real painted width away from the centerline, not just EdgeGeometry directly.
+        click('MenuSelection'); click('SelectEdges'); wait('v.selection.length===2 && w.inspector.batchCount===2')
+        revision=state()['revision']; fill('LineWidth','64'); click('PropertyApply'); wait(f'v.revision==={revision+1}')
+        thick=state()['model']; first=thick['Graph']['Edges'][0]['Id']
+        def screen(x,y):
+            v=state(); return (v['canvas']['x']+(x-v['origin']['x'])*v['zoom'],v['canvas']['y']+(y-v['origin']['y'])*v['zoom'])
+        click('ModeSelect'); page.mouse.click(*screen(275,55)); wait('v.selection.length===1 && v.selection[0]==='+json.dumps(first))
+        assert state()['model']==thick and state()['revision']==revision+1
+        record('Pointer selection hits the painted thick stroke away from its centerline')
+        page.mouse.move(*screen(190,80)); page.mouse.down(); page.mouse.move(*screen(230,55),steps=8); page.mouse.up()
+        wait('v.selection.length===1 && v.selection[0]==='+json.dumps(first))
+        assert state()['model']==thick and state()['revision']==revision+1
+        undo(batch_before)
+        record('Marquee crossing selects stroke-only geometry and the style change remains exactly undoable')
         assert not errors, errors
     except Exception:
         traceback.print_exc(); errors.append(traceback.format_exc())
