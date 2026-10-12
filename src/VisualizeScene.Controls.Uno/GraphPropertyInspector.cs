@@ -48,8 +48,16 @@ public sealed partial class GraphPropertyInspector : UserControl, IDisposable
     }
     public GraphPropertyInspector()
     {
-        var panel = new StackPanel { Spacing = 7 }; panel.Children.Add(title); panel.Children.Add(identity); panel.Children.Add(fields); panel.Children.Add(commands); panel.Children.Add(message);
-        Content = new ScrollViewer { Content = panel, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var root = new Grid();
+        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var heading = new StackPanel { Spacing = 3, Margin = new(0, 0, 0, 7) }; heading.Children.Add(title); heading.Children.Add(identity); root.Children.Add(heading);
+        var scroll = new ScrollViewer { Content = fields, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        commands.Margin = new(0, 7, 0, 0); Grid.SetRow(commands, 2); root.Children.Add(commands);
+        message.MaxHeight = 70; message.Margin = new(0, 5, 0, 0); Grid.SetRow(message, 3); root.Children.Add(message); Content = root;
     }
     private void Update(object? sender, EventArgs args) => Refresh();
     private void Rebind(object? sender, GraphDocumentChangedEventArgs args)
@@ -77,7 +85,7 @@ public sealed partial class GraphPropertyInspector : UserControl, IDisposable
     private CheckBox Check(string name, string label, bool value)
     {
         var input = new CheckBox { IsChecked = value, MinHeight = 26, Padding = new(3, 0, 0, 0) };
-        Register(name, input); fields.AddProperty(name, input); return input;
+        Register(name, input); fields.AddProperty(label, input); return input;
     }
     public void Refresh()
     {
@@ -113,9 +121,10 @@ public sealed partial class GraphPropertyInspector : UserControl, IDisposable
             title.Text = "Edge properties";
             fields.AddGroup("Label"); var label = Text("Label", "Text", edge.Text, true);
             fields.AddGroup("Appearance"); var stroke = Color("Stroke", edge.Stroke); var routing = Choice("Routing", edge.Routing); var directed = Check("Directed", "Directed", edge.Directed);
+            var appearance = EdgeAppearance(edge);
             fields.AddGroup("Data"); var weight = Text("Weight", "Weight", F(edge.Weight));
             Apply(() => target.Document.Edit("Edit edge properties", edit => edit.Update(edit.Edge(id) with
-            { Text = label.Text, Weight = N(weight), Stroke = stroke.Value, Routing = (EdgeRouting)routing.SelectedItem, Directed = directed.IsChecked == true })));
+            { Text = label.Text, Weight = N(weight), Stroke = stroke.Value, Routing = (EdgeRouting)routing.SelectedItem, Directed = directed.IsChecked == true, Style = appearance() })));
             var clear = Command("ClearBends", "Clear bends", () => target.Document.Edit("Clear edge bends", edit => edit.Update(edit.Edge(id) with { Bends = [] })));
             clear.IsEnabled = !edge.Bends.IsDefaultOrEmpty;
             message.Text = edge.SourceId + " → " + edge.TargetId;

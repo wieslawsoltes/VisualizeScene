@@ -40,12 +40,7 @@ public sealed partial class WorkbenchPage
             try { var p = element.TransformToVisual(this).TransformPoint(new Windows.Foundation.Point()); return $"{{\"x\":{Number(p.X)},\"y\":{Number(p.Y)},\"width\":{Number(element.ActualWidth)},\"height\":{Number(element.ActualHeight)}}}"; }
             catch { return "null"; }
         }
-        foreach (var name in new[] { "X", "Y", "Width", "Height", "Apply" })
-        {
-            var id = "Property" + name;
-            if (inspector.FindPropertyEditor(name) is { } editor) testControls[id] = editor;
-            else testControls.Remove(id);
-        }
+        RefreshPropertyDiagnostics();
         foreach (var name in new[] { "Query", "Replacement", "Case", "Word", "Ids", "Hidden", "Selection", "Capture", "Kind", "Results", "Previous", "Next", "SelectAll", "Replace", "ReplaceAll", "Close" })
         {
             var key = "Search" + name;

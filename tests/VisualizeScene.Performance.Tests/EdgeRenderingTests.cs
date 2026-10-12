@@ -9,6 +9,7 @@ static class EdgeRenderingTests
     static GraphEdge Edge(EdgeStyle? style=null)=>new GraphEdge("e","a","b",Stroke:"#000000",Routing:EdgeRouting.Polyline){Style=style};
     public static void Run(Action<string,Action> test)
     {
+        CaptionRenderingTests.Run(test);
         test("Edge renderer: solid/dashed switching resets native paint state",()=>{
             using var surface=SKSurface.Create(new SKImageInfo(220,100));using var renderer=new EdgeStyleRenderer();PointD[] points=[new(20,50),new(200,50)];
             surface.Canvas.Clear(SKColors.White);renderer.Draw(surface.Canvas,Edge(new(3,EdgeDash.Dash,TargetArrow:EdgeArrow.None)),points);var dashed=Pixels(surface);

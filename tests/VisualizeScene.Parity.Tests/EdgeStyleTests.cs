@@ -11,6 +11,7 @@ static class EdgeStyleTests
         [new GraphEdge("ab","a","b",Bends:[],Routing:EdgeRouting.Polyline) { Style = style }],[],[]);
     public static void Run(Action<string,Action> test)
     {
+        EdgeWorkflowTests.Run(test);
         test("Edge styles: old files and constructors retain solid directed defaults", () => {
             var g = Graph(); var json = GraphIO.ToJson(g); Check(!json.Contains("\"Style\""));
             Check(GraphIO.FromJson(json).Edges[0].Style is null);

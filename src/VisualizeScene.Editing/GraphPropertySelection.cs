@@ -9,10 +9,13 @@ public readonly record struct GraphPropertyValue<T>(int Count, bool IsMixed, T V
 /// <summary>Only non-null fields are applied. An empty string, false, and zero are explicit values, not omission.</summary>
 public sealed record GraphPropertyPatch(string? Text = null, NodeShape? Shape = null, string? Fill = null,
     string? Stroke = null, bool? Locked = null, double? Width = null, double? Height = null,
-    EdgeRouting? Routing = null, bool? Directed = null, double? Weight = null, double? FontSize = null)
+    EdgeRouting? Routing = null, bool? Directed = null, double? Weight = null, double? FontSize = null,
+    double? LineWidth = null, EdgeDash? LinePattern = null, EdgeArrow? SourceArrow = null, EdgeArrow? TargetArrow = null)
 {
     internal void Validate()
     {
+        if (LineWidth.HasValue || LinePattern.HasValue || SourceArrow.HasValue || TargetArrow.HasValue)
+            new EdgeStyle(LineWidth ?? 1.5, LinePattern ?? EdgeDash.Solid, SourceArrow ?? EdgeArrow.None, TargetArrow ?? EdgeArrow.Automatic).Validate();
         if (Shape.HasValue && !Enum.IsDefined(Shape.Value) || Routing.HasValue && !Enum.IsDefined(Routing.Value))
             throw new ArgumentException("Unknown shape or routing option.");
         if (Fill is not null && !GraphValidation.ValidColor(Fill) || Stroke is not null && !GraphValidation.ValidColor(Stroke))
@@ -60,6 +63,10 @@ public sealed class GraphPropertySelection
     public GraphPropertyValue<bool> Directed { get; }
     public GraphPropertyValue<double> Weight { get; }
     public GraphPropertyValue<double> FontSize { get; }
+    public GraphPropertyValue<double> LineWidth { get; }
+    public GraphPropertyValue<EdgeDash> LinePattern { get; }
+    public GraphPropertyValue<EdgeArrow> SourceArrow { get; }
+    public GraphPropertyValue<EdgeArrow> TargetArrow { get; }
 
     public GraphPropertySelection(GraphSnapshot snapshot, IEnumerable<string> itemIds,
         SelectionKinds kinds = SelectionKinds.All, CancellationToken cancellationToken = default)
@@ -72,7 +79,8 @@ public sealed class GraphPropertySelection
         Aggregate<string> text = new(), fill = new(), stroke = new();
         Aggregate<NodeShape> shape = new(); Aggregate<EdgeRouting> routing = new();
         Aggregate<bool> locked = new(), directed = new();
-        Aggregate<double> width = new(), height = new(), weight = new(), fontSize = new();
+        Aggregate<double> width = new(), height = new(), weight = new(), fontSize = new(), lineWidth = new();
+        Aggregate<EdgeDash> linePattern = new(); Aggregate<EdgeArrow> sourceArrow = new(), targetArrow = new();
         foreach (var id in itemIds)
         {
             cancellationToken.ThrowIfCancellationRequested(); ArgumentNullException.ThrowIfNull(id);
@@ -87,6 +95,8 @@ public sealed class GraphPropertySelection
             else if (index.Edges.TryGetValue(id, out var edge))
             {
                 if ((kinds & SelectionKinds.Edges) == 0) continue;
+                var style = edge.Style ?? EdgeStyle.Default;
+                lineWidth.Add(style.Width); linePattern.Add(style.Dash); sourceArrow.Add(style.SourceArrow); targetArrow.Add(style.TargetArrow);
                 EdgeCount++; text.Add(edge.Text); stroke.Add(edge.Stroke); routing.Add(edge.Routing); directed.Add(edge.Directed); weight.Add(edge.Weight);
             }
             else if (index.Labels.TryGetValue(id, out var label))
@@ -105,6 +115,7 @@ public sealed class GraphPropertySelection
         ItemIds = selected.ToImmutable(); Text = text.Result; Shape = shape.Result; Fill = fill.Result; Stroke = stroke.Result;
         Locked = locked.Result; Width = width.Result; Height = height.Result; Routing = routing.Result; Directed = directed.Result;
         Weight = weight.Result; FontSize = fontSize.Result;
+        LineWidth = lineWidth.Result; LinePattern = linePattern.Result; SourceArrow = sourceArrow.Result; TargetArrow = targetArrow.Result;
     }
 
     /// <summary>One atomic edit. Position locks are checked before changes, so resizing locked nodes requires an earlier unlock.</summary>
@@ -131,7 +142,13 @@ public sealed class GraphPropertySelection
                 }
                 else if (index.Edges.TryGetValue(id, out var edge))
                 {
-                    var next = edge with { Text = patch.Text ?? edge.Text, Stroke = patch.Stroke ?? edge.Stroke,
+                    var style = edge.Style;
+                    if (patch.LineWidth.HasValue || patch.LinePattern.HasValue || patch.SourceArrow.HasValue || patch.TargetArrow.HasValue)
+                        style = (style ?? EdgeStyle.Default) with { Width = patch.LineWidth ?? style?.Width ?? 1.5,
+                            Dash = patch.LinePattern ?? style?.Dash ?? EdgeDash.Solid,
+                            SourceArrow = patch.SourceArrow ?? style?.SourceArrow ?? EdgeArrow.None,
+                            TargetArrow = patch.TargetArrow ?? style?.TargetArrow ?? EdgeArrow.Automatic };
+                    var next = edge with { Style = style, Text = patch.Text ?? edge.Text, Stroke = patch.Stroke ?? edge.Stroke,
                         Routing = patch.Routing ?? edge.Routing, Directed = patch.Directed ?? edge.Directed, Weight = patch.Weight ?? edge.Weight };
                     if (next != edge) { edit.Update(next); changed++; }
                 }

@@ -79,6 +79,14 @@ public sealed partial class GraphPropertyInspector
             Number("Height", "Height", captured.Height, (p, v) => p with { Height = v });
             Boolean("Locked", "Lock position", captured.Locked, (p, v) => p with { Locked = v });
         }
+        if (captured.EdgeCount > 0)
+        {
+            fields.AddGroup("Line style");
+            Number("LineWidth", "Line width", captured.LineWidth, (p, v) => p with { LineWidth = v });
+            EnumField("LinePattern", captured.LinePattern, (p, v) => p with { LinePattern = v });
+            EnumField("SourceArrow", captured.SourceArrow, (p, v) => p with { SourceArrow = v });
+            EnumField("TargetArrow", captured.TargetArrow, (p, v) => p with { TargetArrow = v });
+        }
         if (captured.Weight.Count > 0)
         {
             fields.AddGroup("Data");
