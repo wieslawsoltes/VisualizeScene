@@ -76,7 +76,21 @@ public sealed partial class WorkbenchPage : Page
     {
         graph.SetMode(mode); modeText.Text = mode.ToString(); status.Text = mode switch { EditorMode.CreateEdge => "Click a source node or port, then a target. Escape cancels.", EditorMode.CreateNode => "Click to add a node. Escape returns to selection.", EditorMode.Pan => "Drag to pan. Mouse wheel zooms at the pointer.", _ => "Drag nodes to move; drag empty space to select; double-click to edit." };
     }
-    private void UpdateStatus() => counts.Text = $"{document.Snapshot.Nodes.Length:N0} nodes   {document.Snapshot.Edges.Length:N0} edges   {graph.Session.Selection.Count} selected";
+    private void UpdateStatus()
+    {
+        counts.Text = $"{document.Snapshot.Nodes.Length:N0} nodes   {document.Snapshot.Edges.Length:N0} edges   {graph.Session.Selection.Count} selected";
+        // Selection/undo availability is input state, not a rendering side effect.
+        UpdateCommandAvailability();
+    }
+    private void UpdateCommandAvailability()
+    {
+        if (testControls.GetValueOrDefault("Undo") is Control undo) undo.IsEnabled = document.CanUndo;
+        if (testControls.GetValueOrDefault("Redo") is Control redo) redo.IsEnabled = document.CanRedo;
+        var selected = graph.Session.Selection.Count > 0;
+        if (testControls.GetValueOrDefault("Cut") is Control cut) cut.IsEnabled = selected;
+        if (testControls.GetValueOrDefault("Copy") is Control copy) copy.IsEnabled = selected;
+        if (testControls.GetValueOrDefault("Delete") is Control delete) delete.IsEnabled = selected;
+    }
     private void FoldSelected()
     {
         foreach (var id in graph.Session.Selection.ToArray()) if (document.Snapshot.Index().Nodes.TryGetValue(id, out var n) && n.IsGroup) graph.Session.ToggleGroup(id);
