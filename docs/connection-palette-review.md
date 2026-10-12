@@ -47,6 +47,34 @@ current property references before publishing control bounds, and batch input te
 verify the actual focused text field and entered value before applying. This does not
 replace native pointer input or add a graph mutation hook.
 
+## Editor integration and clear-text correction
+
+Review found that the portable stroke/marker hit helpers were not yet called by the
+editor's own spatial broad phase and selection commands. Actual pointer picking,
+marquee crossing/containment and keyboard focus now use these appearance bounds and
+predicates. The original null-style centerline behavior is preserved; styled dash gaps
+are deliberately selectable as continuous strokes. The edge index remains spatial: an
+actual EditorSession regression with 10,000 styled edges checks fewer than 100 examined
+entries for the local probe. Unstyled bounds stream route points without per-path LINQ
+iterators, and area predicates no longer create a Range/Any closure per candidate.
+
+The `edge_area_9900` benchmark compares the same public QueryArea call on the same 9,900
+unstyled edges, checking exact returned IDs before sampling. Both revisions use identical
+harness code, warmed indexes and fixed geometry; baseline is PR #12 merge
+`9bf42c7a953b28b1aaf79133513919102b1ae38d`. Timing/allocation include result collection and
+sorting, not graph setup. This does not compare against the earlier incorrect behavior
+for styled edges, nor claim allocation-free result construction. All other workloads,
+including slower ones and the common raster hash, remain in the report.
+
+The first PR #13 browser run stopped at explicit Clear selected text on a mixed
+selection. An empty placeholder and an intentional clear used the same text value;
+repeated value notifications could remove the pending clear. `GraphTextPropertyDraft`
+now retains that intent independently, distinguishes null (unchanged) from empty
+(clear), and preserves no-op/reset semantics. Portable duplicate-notification and exact
+undo regressions accompany the unchanged native clear/undo browser assertion. The
+failed artifact is retained. Successful workflow results, not this inventory, establish
+which revisions passed.
+
 ## Validation
 
 Portable tests exercise preset creation, cancellation, validation, sparse style batches

@@ -54,6 +54,11 @@ Measure("hit_test_local", () => sink = editor.Hit(new(50, 30), handles: false), 
 Measure("connection_candidate_local", () => sink = editor.FindConnectionCandidate(new(100, 30)), batch: 10);
 var defaultPolicy = new ConnectionPolicy(); var request = new ConnectionRequest(new("n0"), new("n1")); var graphIndex = graph.Index();
 Measure("connection_policy_default", () => sink = defaultPolicy.Evaluate(graphIndex, request), batch: 10);
+// Compare identical legacy-edge marquee semantics in both revisions; construction is outside this warmed query.
+var edgeArea = new RectD(-10, -10, 30000, 25000);
+if (!editor.QueryArea(edgeArea, kinds: SelectionKinds.Edges).SequenceEqual(edges.Select(e => e.Id).Order(StringComparer.Ordinal)))
+    throw new InvalidOperationException("The edge-area benchmark returned incorrect items.");
+Measure("edge_area_9900", () => sink = editor.QueryArea(edgeArea, kinds: SelectionKinds.Edges));
 editor.SelectAll();
 Measure("selected_handle_hit", () => sink = editor.Hit(new(50, 30)), batch: 10);
 var selectedOptions = new RenderOptions(ShowGrid: false, Selection: editor.Selection);
