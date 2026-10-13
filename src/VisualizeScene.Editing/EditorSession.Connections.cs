@@ -100,17 +100,24 @@ public sealed partial class EditorSession
     /// <summary>Reconnects an endpoint as one validated, undoable operation. Invalid requests do not mutate the graph.</summary>
     public ConnectionDecision Reconnect(string edgeId, EdgeEnd end, ConnectionEnd endpoint)
     {
-        var edge = index.Edges[edgeId];
+        ArgumentNullException.ThrowIfNull(edgeId); ArgumentNullException.ThrowIfNull(endpoint);
+        if (!Enum.IsDefined(end)) throw new ArgumentOutOfRangeException(nameof(end));
+        var snapshot = Document.Snapshot; var revision = Document.Revision; var selected = Selection; var policy = ConnectionPolicy;
+        var edge = snapshot.Index().Edges[edgeId];
         var request = end == EdgeEnd.Source
             ? new ConnectionRequest(endpoint, new(edge.TargetId, edge.TargetPortId), edgeId)
             : new ConnectionRequest(new(edge.SourceId, edge.SourcePortId), endpoint, edgeId);
-        var decision = connectionPolicy.Evaluate(index, request);
+        var decision = policy.Evaluate(snapshot.Index(), request);
+        if (Document.Revision != revision || !ReferenceEquals(snapshot, Document.Snapshot) ||
+            !ReferenceEquals(selected, Selection) || !ReferenceEquals(policy, ConnectionPolicy))
+            throw new InvalidOperationException("The graph, selection or connection policy changed while reconnecting an edge.");
+        if (decision is null) throw new InvalidOperationException("The connection policy returned no decision.");
         if (!decision.Allowed) return decision;
         Document.Edit("Reconnect " + end.ToString().ToLowerInvariant(), edit => edit.Update(edge with
         {
             SourceId = request.Source.NodeId, SourcePortId = request.Source.PortId,
             TargetId = request.Target.NodeId, TargetPortId = request.Target.PortId
-        }));
+        }), expectedRevision: revision);
         return decision;
     }
 

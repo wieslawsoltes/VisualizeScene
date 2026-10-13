@@ -27,6 +27,7 @@ ArrangementTests.Run(Test);
 GroupSizingTests.Run(Test);
 GroupSizingScopeTests.Run(Test);
 GroupFoldingTests.Run(Test);
+EdgeCommandTests.Run(Test);
 Directory.CreateDirectory("artifacts/validation");
 File.WriteAllText("artifacts/validation/parity.xml", new XElement("testsuite", new XAttribute("name", "Placement, snapping and selection"),
     new XAttribute("tests", results.Count), new XAttribute("failures", results.Count(r => r.Error is not null)), results.Select(r =>
