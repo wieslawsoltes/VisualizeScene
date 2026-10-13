@@ -10,6 +10,11 @@ namespace VisualizeScene.Workbench;
 
 public sealed partial class WorkbenchPage
 {
+    private sealed class GridSettingsDialog : ContentDialog
+    {
+        // ContentDialog buttons belong to its template namescope, not the page namescope.
+        public FrameworkElement? NativePart(string name) => GetTemplateChild(name) as FrameworkElement;
+    }
     private GraphGridEditor? gridEditor;
     private ContentDialog? gridDialog;
     private bool gridDialogReady;
@@ -37,14 +42,14 @@ public sealed partial class WorkbenchPage
         using var editor = new GraphGridEditor(); editor.LoadSettings(original); gridEditor = editor;
         var scroll = new ScrollViewer { Content = editor, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxHeight = Math.Max(180, Math.Min(550, XamlRoot.Size.Height - 200)) };
-        var dialog = new ContentDialog { XamlRoot = XamlRoot, Title = "Grid settings", Content = scroll, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary };
+        var dialog = new GridSettingsDialog { XamlRoot = XamlRoot, Title = "Grid settings", Content = scroll, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary };
         gridDialog = dialog; gridDialogReady = false; Register("GridOptionsDialog",dialog);
         foreach(var name in new[]{"Pattern","Color","Thickness","Horizontal","Vertical","OriginX","OriginY","Axes","Anchor","Visible","Snap","Reset","Preview","Feedback"})
             if(editor.FindElement(name) is { } element) { Register("GridOption"+name,element); if(element is Control) RegisterMenuDiagnostics("GridOption"+name,element,includeControl:true); }
         dialog.Opened += (_,_) => {
             gridDialogReady = true;
-            if(dialog.FindName("PrimaryButton") is FrameworkElement apply) { Register("GridOptionsApply",apply); RegisterMenuDiagnostics("GridOptionsApply",apply,includeControl:true); }
-            if(dialog.FindName("CloseButton") is FrameworkElement cancel) { Register("GridOptionsCancel",cancel); RegisterMenuDiagnostics("GridOptionsCancel",cancel,includeControl:true); }
+            if(dialog.NativePart("PrimaryButton") is FrameworkElement apply) { Register("GridOptionsApply",apply); RegisterMenuDiagnostics("GridOptionsApply",apply,includeControl:true); }
+            if(dialog.NativePart("CloseButton") is FrameworkElement cancel) { Register("GridOptionsCancel",cancel); RegisterMenuDiagnostics("GridOptionsCancel",cancel,includeControl:true); }
             editor.FindElement("Horizontal")?.FocusIfControl(); PublishTestState();
         };
         var accepted = false;
