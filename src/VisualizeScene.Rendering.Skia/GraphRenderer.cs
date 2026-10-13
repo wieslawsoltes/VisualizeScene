@@ -150,7 +150,7 @@ public sealed partial class GraphRenderer : IDisposable
         if (disposed) return; disposed = true;
         DisposePictures(); foreach (var edge in edges.Values) edge.Path.Dispose(); edges.Clear();
         edgePainter.Dispose(); paint.Dispose(); shaper.Dispose(); if (ownsTypeface) typeface.Dispose();
-        graph = null; index = null; measuredLabels.Clear(); ClearAnnotationCache(); visibleNodeIds.Clear(); visibleEdgeIds.Clear(); visibleNodes.Clear(); visibleGroups.Clear();
+        graph = null; index = null; measuredLabels.Clear(); measuredCaptions.Clear(); ClearAnnotationCache(); visibleNodeIds.Clear(); visibleEdgeIds.Clear(); visibleNodes.Clear(); visibleGroups.Clear();
         nodeIndex = new([]); edgeIndex = new([]); ClearEdgeCaptions(); order.Clear(); depths.Clear();
     }
 }

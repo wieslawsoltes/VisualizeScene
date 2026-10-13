@@ -20,6 +20,7 @@ public sealed partial class GraphControl
         GraphRenderer next;
         try { next = new GraphRenderer(face) { PictureCacheCapacity = renderer.PictureCacheCapacity }; } catch { face.Dispose(); throw; }
         renderer.Dispose(); customTypeface?.Dispose(); customTypeface = face; renderer = next; boundsSnapshot = null;
-        Session.LabelSizeProvider = label => renderer.MeasureLabel(label); Invalidate();
+        Session.LabelSizeProvider = label => renderer.MeasureLabel(label);
+        Session.NodeCaptionSizeProvider = renderer.MeasureNodeCaption; Invalidate();
     }
 }

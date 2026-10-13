@@ -126,6 +126,9 @@ jobs:
       - name: Browser arrangement toolbar and size matching
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/arrangement.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Browser measured node caption sizing
+        if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
+        run: python tests/browser/caption_sizing.py http://127.0.0.1:8080/VisualizeScene/?test=1
       - name: Browser layouts, analysis, exports and samples
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/features.py http://127.0.0.1:8080/VisualizeScene/?test=1

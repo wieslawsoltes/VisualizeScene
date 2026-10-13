@@ -15,7 +15,8 @@ public sealed partial class WorkbenchPage
         arrangeToolbar.Error += (_, error) => Report(error);
         arrangeToolbar.StateChanged += (_, _) => UpdateArrangeMenu();
         foreach (var command in Enum.GetValues<GraphArrangeCommand>())
-            if (arrangeToolbar.FindButton(command) is { } button) Register("Arrange" + command, button);
+            if (arrangeToolbar.FindButton(command) is { } button)
+            { Register("Arrange" + command, button); RegisterMenuDiagnostics("Arrange" + command, button, includeControl: true); }
         UpdateArrangeMenu();
         var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
         tools.Children.Add(arrangeToolbar); tools.Children.Add(CreateOrderToolbar());
@@ -38,7 +39,7 @@ public sealed partial class WorkbenchPage
     {
 #if __WASM__
         if (!DiagnosticsEnabled || arrangeToolbar is null) return;
-        PublishZoomChoice();
+        PublishZoomChoice(); PublishCaptionSizing();
         // Read-only native dropdown state lets tests wait for actual open/close rather than guessing animation delays.
         Uno.Foundation.WebAssemblyRuntime.InvokeJS($"globalThis.visualizeSceneLayout={{kind:{layoutKind.SelectedIndex},open:{(layoutKind.IsDropDownOpen ? "true" : "false")},direction:{direction.SelectedIndex},directionOpen:{(direction.IsDropDownOpen ? "true" : "false")}}};");
         var state = arrangeToolbar.State;
