@@ -125,6 +125,13 @@ jobs:
       - name: Browser staged native grid settings
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/grid.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Preserve grid dialog diagnostics immediately
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
+        with:
+          name: browser-grid
+          path: artifacts/browser-workspace/grid
+          if-no-files-found: error
       - name: Browser graph Find and Replace
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/search.py http://127.0.0.1:8080/VisualizeScene/?test=1

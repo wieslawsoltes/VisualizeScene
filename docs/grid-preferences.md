@@ -7,7 +7,10 @@ horizontal/vertical spacing, X/Y origin, five display patterns, #RRGGBB color,
 and the node anchor. Apply validates and publishes the complete configuration;
 Cancel/Escape discard it. Reset is also staged until Apply. Invalid input keeps
 the dialog open. The editor parses decimal-point numbers using invariant culture.
-The preview is at 100% zoom, not a duplicate graph editor.
+The preview is at 100% zoom, not a duplicate graph editor. Preference rows and
+preview scroll inside the reusable control; validation feedback and Reset remain
+in a separate fixed footer. The dialog supplies a finite editor height and adjusts
+it when the window changes, leaving the native Apply/Cancel row outside both.
 
 The dialog restores focus after closing and rejects stale settings/session
 replacement before applying. A native flyout closes before opening the modal
@@ -112,3 +115,25 @@ Those references describe related yWorks behavior; this does **not** establish
 WPF API/template/screenshot parity. Full docking, specialized styles, layout,
 printing, accessibility and physical GPU/native GUI certification remain separate.
 The previously platform-blocked PR20 edge-toolbar supplement is not included.
+
+## Native dialog validation review
+
+At head `65206b38ff9157a1cb96fab6223863f468d08eb3`, Build run
+`38463526706` passed 654 XML cases and the downloaded workspace reports contain
+135 passing existing browser scenarios, but the new grid suite failed after
+seven passing scenarios. Its retained artifact
+`11848193020` shows Reset partly clipped at the bottom of the outer 550-unit
+ScrollViewer. The button's native PointerEntered never reached the requested
+center, so the existing input observer correctly failed instead of clicking
+through the clipping region. This was a real layout defect, not a timing allowance.
+
+The recovery removes the outer scroller, gives the editor its own bounded body
+scroller and pins feedback/Reset outside that body. Window-size changes adjust
+the editor's finite viewport. Browser assertions retain all prior setting,
+preview, exact-data and undo checks, additionally require footer containment and
+stable actions during validation errors, and exercise resize/scroll/reset/cancel
+at 640×480. Grid artifacts are uploaded immediately after that suite so later
+workspace checks do not delay failure diagnosis. No failed-job retry or removed
+native-input assertion is used. Final-head execution remains separately recorded
+in the PR. Extreme standalone grid-planner tests do not expand the graph renderer’s
+existing world-coordinate range.

@@ -1,5 +1,4 @@
 """Real compiled-Uno grid preferences, drawing counters and snapped pointer creation."""
-import copy
 import json
 from pathlib import Path
 import sys
@@ -43,6 +42,14 @@ with sync_playwright() as p:
         page.keyboard.press('Enter');wait('v.grid.'+key+'.index==='+str(index)+' && !v.grid.'+key+'.open && v.grid.ready')
     def finish(apply=True):
         click('GridOptionsApply' if apply else 'GridOptionsCancel');wait('!v.grid.ready && !v.controls.GridOptionsApply && v.graphFocused')
+    def footer_bounds():
+        v=state();c=v['controls'];body=c['GridOptionBody'];footer=c['GridOptionFooter'];reset=c['GridOptionReset'];editor=c['GridOptionsEditor']
+        assert reset['y']>=body['y']+body['height']-0.1,(body,reset)
+        assert reset['y']>=footer['y'] and reset['y']+reset['height']<=footer['y']+footer['height']+0.1,(footer,reset)
+        assert reset['y']+reset['height']<=editor['y']+editor['height']+0.1,(editor,reset)
+        for name in ['GridOptionReset','GridOptionsApply','GridOptionsCancel']:
+            b=c[name];assert b['x']>=0 and b['y']>=0 and b['x']+b['width']<=page.viewport_size['width'] and b['y']+b['height']<=page.viewport_size['height'],(name,b)
+        return {k:c[k] for k in ['GridOptionFooter','GridOptionReset','GridOptionsApply','GridOptionsCancel']}
     def created_center(x_snap,y_snap):
         before=state();click('ModeNode');b=state()['canvas'];x=round(b['x']+b['width']*.63);y=round(b['y']+b['height']*.64)
         v=state();world=((x-b['x'])/v['zoom']+v['origin']['x'],(y-b['y'])/v['zoom']+v['origin']['y']);g=v['grid']
@@ -64,7 +71,7 @@ with sync_playwright() as p:
         page.screenshot(path=str(out/'staged-grid-options.png'));finish(False)
         assert frozen()==before and settings()==old
         record('Compact options preview stages native input and Cancel leaves the entire view and graph unchanged')
-        open_options();text('Horizontal','0');click('GridOptionsApply');wait('v.grid.ready && v.grid.error.length>0')
+        open_options();footer_before=footer_bounds();text('Horizontal','0');click('GridOptionsApply');wait('v.grid.ready && v.grid.error.length>0');assert footer_bounds()==footer_before
         assert frozen()==before and settings()==old
         page.screenshot(path=str(out/'invalid-grid-options.png'));text('Horizontal','25');finish(False)
         record('Invalid spacing keeps the dialog open and rejects all settings atomically')
@@ -88,7 +95,7 @@ with sync_playwright() as p:
         open_options();choice('Axes',1);click('GridOptionVisible');finish();wait('!v.grid.visible && v.grid.snap && v.grid.axes===1 && v.grid.marks===0')
         created_center(True,False)
         record('Hidden grids still snap to the chosen X axis while leaving Y unconstrained')
-        old=settings();open_options();click('GridOptionReset');assert settings()==old;finish(False);assert settings()==old
+        old=settings();open_options();footer_bounds();click('GridOptionReset');assert settings()==old;finish(False);assert settings()==old
         open_options();click('GridOptionReset');finish();wait("v.grid.pattern==='Dots' && v.grid.horizontal===10 && v.grid.vertical===10 && v.grid.anchor==='TopLeft'")
         assert state()['model']==baseline
         record('Reset is staged and only applies when confirmed, retaining graph edits and undo history')
@@ -111,6 +118,14 @@ with sync_playwright() as p:
         text('Horizontal','45');finish();wait('v.grid.horizontal===45');assert state()['model']==baseline
         open_options();text('Horizontal','55');page.keyboard.press('Escape');wait('!v.grid.ready && v.graphFocused');assert state()['grid']['horizontal']==45
         record('Narrow native options remain usable and Escape discards changes with focus restored')
+        # Resize an already-open native dialog; all action rows stay outside its scrollable body.
+        open_options();page.set_viewport_size({'width':640,'height':480});wait('v.controls.GridOptionsEditor.height<=280');page.wait_for_timeout(250)
+        pinned=footer_bounds();body=state()['controls']['GridOptionBody'];page.mouse.move(body['x']+body['width']/2,body['y']+body['height']/2)
+        page.mouse.wheel(0,600);wait('v.grid.scrollOffset>0');assert footer_bounds()==pinned
+        page.screenshot(path=str(out/'short-dialog-pinned-actions.png'))
+        click('GridOptionReset');wait("v.grid.inputs.Horizontal==='10'");assert state()['grid']['horizontal']==45
+        finish(False);assert state()['grid']['horizontal']==45 and state()['model']==baseline
+        record('Short-window resize and native scrolling keep Reset, Apply and Cancel pinned and reachable')
         assert not errors,errors
     except Exception:
         traceback.print_exc();errors.append(traceback.format_exc())

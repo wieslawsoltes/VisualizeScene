@@ -41,7 +41,7 @@ public sealed class GraphGridEditor : UserControl, IDisposable
     public FrameworkElement? FindElement(string name) => elements.GetValueOrDefault(name);
     public GraphGridEditor()
     {
-        MinWidth = 280; MaxWidth = 440; HorizontalAlignment = HorizontalAlignment.Stretch;
+        MinWidth = 280; MaxWidth = 440; MaxHeight = 550; HorizontalAlignment = HorizontalAlignment.Stretch;
         var root = new StackPanel { Spacing = 5 };
         var toggles = new Grid(); toggles.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); toggles.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         toggles.Children.Add(visible); Grid.SetColumn(snapping, 1); toggles.Children.Add(snapping); root.Children.Add(toggles);
@@ -50,10 +50,19 @@ public sealed class GraphGridEditor : UserControl, IDisposable
         properties.AddGroup("Snapping"); Add("Snap axes", "Axes", axes); Add("Node anchor", "Anchor", anchor); root.Children.Add(properties);
         root.Children.Add(new Border { Child = preview, BorderThickness = new(1), BorderBrush = NodePalette.Brush("#BCC6D0") });
         root.Children.Add(new TextBlock { Text = "Preview at 100%. Visibility and snapping are independent. Spacing is in graph units; thickness is in screen units.", FontSize = 11, TextWrapping = TextWrapping.Wrap });
-        root.Children.Add(feedback);
         var reset = new Button { Content = "Reset to defaults", FontSize = 12, MinHeight = 27, Padding = new(7,3,7,3) };
         Register("Reset", reset); Register("Visible", visible); Register("Snap", snapping); Register("Preview", preview); Register("Feedback", feedback);
-        reset.Click += (_, _) => LoadSettings(GraphGridSettings.Default); root.Children.Add(reset); Content = root;
+        reset.Click += (_, _) => LoadSettings(GraphGridSettings.Default);
+        // Only the preference rows and preview scroll. Feedback and Reset must remain
+        // reachable even when the native dialog constrains the available height.
+        var scrolling = new ScrollViewer { Content = root, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var footer = new Grid { Margin = new(0,5,0,0) };
+        footer.RowDefinitions.Add(new() { Height = new(34) }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        footer.Children.Add(feedback); Grid.SetRow(reset,1); reset.HorizontalAlignment = HorizontalAlignment.Left; footer.Children.Add(reset);
+        var layout = new Grid(); layout.RowDefinitions.Add(new() { Height = new(1,GridUnitType.Star) });
+        layout.RowDefinitions.Add(new() { Height = GridLength.Auto }); layout.Children.Add(scrolling); Grid.SetRow(footer,1); layout.Children.Add(footer);
+        Register("Body",scrolling); Register("Footer",footer); Content = layout;
         foreach (var field in new[] { horizontal, vertical, originX, originY, color, thickness }) field.TextChanged += (_, _) => Refresh();
         foreach (var field in new[] { pattern, axes, anchor }) field.SelectionChanged += (_, _) => Refresh();
         visible.Checked += (_, _) => Refresh(); visible.Unchecked += (_, _) => Refresh(); snapping.Checked += (_, _) => Refresh(); snapping.Unchecked += (_, _) => Refresh();

@@ -37,13 +37,19 @@ public sealed partial class WorkbenchPage
     }
     private async Task ShowGridSettings()
     {
-        if (gridDialog is not null || XamlRoot is null || !graph.IsLoaded) return;
+        if (gridDialog is not null || XamlRoot is not { } root || !graph.IsLoaded) return;
         var session = graph.Session; var original = graph.GridSettings; session.CancelGesture();
         using var editor = new GraphGridEditor(); editor.LoadSettings(original); gridEditor = editor;
-        var scroll = new ScrollViewer { Content = editor, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxHeight = Math.Max(180, Math.Min(550, XamlRoot.Size.Height - 200)) };
-        var dialog = new GridSettingsDialog { XamlRoot = XamlRoot, Title = "Grid settings", Content = scroll, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary };
-        gridDialog = dialog; gridDialogReady = false; Register("GridOptionsDialog",dialog);
+        // Give the reusable editor a finite viewport; do not put its pinned footer
+        // inside another scrolling region. Resize while open as well as at creation.
+        void SizeEditor() => editor.Height = Math.Max(120,Math.Min(550,root.Size.Height - 200));
+        void RootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => SizeEditor();
+        SizeEditor();
+        var dialog = new GridSettingsDialog { XamlRoot = root, Title = "Grid settings", Content = editor, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary };
+        gridDialog = dialog; gridDialogReady = false; Register("GridOptionsDialog",dialog); Register("GridOptionsEditor",editor);
+        // Parent viewport observations have no pointer observer: they must not replace
+        // the target control's native PointerEntered token when events bubble.
+        foreach(var name in new[]{"Body","Footer"}) if(editor.FindElement(name) is { } part) Register("GridOption"+name,part);
         foreach(var name in new[]{"Pattern","Color","Thickness","Horizontal","Vertical","OriginX","OriginY","Axes","Anchor","Visible","Snap","Reset","Preview","Feedback"})
             if(editor.FindElement(name) is { } element) { Register("GridOption"+name,element); if(element is Control) RegisterMenuDiagnostics("GridOption"+name,element,includeControl:true); }
         dialog.Opened += (_,_) => {
@@ -61,10 +67,10 @@ public sealed partial class WorkbenchPage
             graph.GridSettings = settings; accepted = true;
         };
         RoutedEventHandler unloaded = (_,_) => dialog.Hide();
-        Unloaded += unloaded;
+        Unloaded += unloaded; root.Changed += RootChanged;
         try { await dialog.ShowAsync(); }
         finally {
-            Unloaded -= unloaded; gridDialogReady = false; gridDialog = null; gridEditor = null;
+            Unloaded -= unloaded; root.Changed -= RootChanged; gridDialogReady = false; gridDialog = null; gridEditor = null;
             foreach(var key in testControls.Keys.Where(k=>k.StartsWith("GridOption",StringComparison.Ordinal)).ToArray()) testControls.Remove(key);
             SyncGridMenu();
             if(graph.IsLoaded && ReferenceEquals(session,graph.Session)) { if(accepted) status.Text = "Grid settings applied."; graph.Focus(FocusState.Programmatic); }
@@ -78,9 +84,10 @@ public sealed partial class WorkbenchPage
         static string N(double value) => double.IsFinite(value) ? value.ToString("R",CultureInfo.InvariantCulture) : "0";
         static string S(string value) => "\""+JsonEncodedText.Encode(value)+"\"";
         var g = graph.GridSettings;var stats = graph.GridStatistics;var plan = stats.Plan;
+        var scroller = gridEditor?.FindElement("Body") as ScrollViewer;
         var inputs = "{" + string.Join(",", new[]{"Horizontal","Vertical","OriginX","OriginY","Color","Thickness"}.Select(name => S(name)+":"+S((gridEditor?.FindElement(name) as TextBox)?.Text??"")))+"}";
         string Combo(string name) => gridEditor?.FindElement(name) is ComboBox c ? $"{{index:{c.SelectedIndex},open:{(c.IsDropDownOpen?"true":"false")}}}" : "null";
-        return $"{{inputs:{inputs},ready:{(gridDialogReady?"true":"false")},error:{S(gridEditor?.ValidationError??"")},horizontal:{N(g.HorizontalSpacing)},vertical:{N(g.VerticalSpacing)},origin:{{x:{N(g.Origin.X)},y:{N(g.Origin.Y)}}},pattern:{S(g.Pattern.ToString())},color:{S(g.Color)},thickness:{N(g.Thickness)},visible:{(g.Visible?"true":"false")},snap:{(g.SnapEnabled?"true":"false")},axes:{(int)g.SnapAxes},anchor:{S(g.NodeAnchor.ToString())},marks:{plan.Marks},xStep:{N(plan.X.Step)},yStep:{N(plan.Y.Step)},xFirst:{N(plan.X.First)},yFirst:{N(plan.Y.First)},xCount:{plan.X.Count},yCount:{plan.Y.Count},builds:{stats.GeometryBuilds},patternInput:{Combo("Pattern")},axesInput:{Combo("Axes")},anchorInput:{Combo("Anchor")}}}";
+        return $"{{inputs:{inputs},scrollOffset:{N(scroller?.VerticalOffset??0)},scrollableHeight:{N(scroller?.ScrollableHeight??0)},ready:{(gridDialogReady?"true":"false")},error:{S(gridEditor?.ValidationError??"")},horizontal:{N(g.HorizontalSpacing)},vertical:{N(g.VerticalSpacing)},origin:{{x:{N(g.Origin.X)},y:{N(g.Origin.Y)}}},pattern:{S(g.Pattern.ToString())},color:{S(g.Color)},thickness:{N(g.Thickness)},visible:{(g.Visible?"true":"false")},snap:{(g.SnapEnabled?"true":"false")},axes:{(int)g.SnapAxes},anchor:{S(g.NodeAnchor.ToString())},marks:{plan.Marks},xStep:{N(plan.X.Step)},yStep:{N(plan.Y.Step)},xFirst:{N(plan.X.First)},yFirst:{N(plan.Y.First)},xCount:{plan.X.Count},yCount:{plan.Y.Count},builds:{stats.GeometryBuilds},patternInput:{Combo("Pattern")},axesInput:{Combo("Axes")},anchorInput:{Combo("Anchor")}}}";
     }
 }
 
