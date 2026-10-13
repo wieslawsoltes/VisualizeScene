@@ -68,6 +68,10 @@ and selection-state query are independently reusable. See [arrangement contracts
 Both are available from the toolbar, Arrange menu and graph context menu, preserve child
 positions, and process selected nested groups from the inside out. See [group fitting](docs/group-sizing.md).
 
+The Fold toolbar and context command now process a multiselection as **one undoable
+transaction**. The Arrange menu also offers explicit **Expand selected groups** and
+**Collapse selected groups**, with selection-aware availability. See [group folding](docs/group-folding.md).
+
 ### Graph Find and Replace
 
 Use **Edit → Find graph text / Replace graph text**, or Ctrl+F / Ctrl+H while the graph
