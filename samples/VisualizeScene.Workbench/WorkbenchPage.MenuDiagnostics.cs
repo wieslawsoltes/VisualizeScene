@@ -12,10 +12,11 @@ public sealed partial class WorkbenchPage
     private readonly Queue<string> diagnosticMenuEvents = new();
     private long diagnosticMenuToken, diagnosticHoveredMenu;
 #endif
-    private void RegisterMenuDiagnostics(string id, FrameworkElement element)
+    private void RegisterMenuDiagnostics(string id, FrameworkElement element, bool includeControl = false)
     {
 #if __WASM__
-        if (!DiagnosticsEnabled || element is not MenuFlyoutItemBase) return;
+        if (!DiagnosticsEnabled || element is not MenuFlyoutItemBase && !includeControl) return;
+        if (diagnosticMenus.TryGetValue(id, out var previous) && ReferenceEquals(previous.Element, element)) return;
         var token = ++diagnosticMenuToken;
         diagnosticMenus[id] = (element, token);
         void Record(string kind)

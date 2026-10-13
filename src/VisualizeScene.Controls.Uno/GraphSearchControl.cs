@@ -10,7 +10,7 @@ using Windows.System;
 namespace VisualizeScene.Controls.Uno;
 
 /// <summary>Reusable modeless graph Find/Replace. Queries are debounced; stale completions cannot edit or select a new revision.</summary>
-public sealed class GraphSearchControl : UserControl, IDisposable
+public sealed partial class GraphSearchControl : UserControl, IDisposable
 {
     private sealed record Row(int Number, GraphSearchMatch Match)
     {
@@ -57,16 +57,17 @@ public sealed class GraphSearchControl : UserControl, IDisposable
             if (target is not null)
             {
                 target.Document.Changed += Changed; target.DocumentChanged += Rebind;
-                target.KeyDown += TargetKey;
+                target.KeyDown += TargetKey; target.SizeChanged += TargetSizeChanged;
             }
-            RequestSearch();
+            ConstrainToViewport(); RequestSearch();
         }
     }
     public GraphSearchControl()
     {
         Visibility = Visibility.Collapsed; HorizontalAlignment = HorizontalAlignment.Right; VerticalAlignment = VerticalAlignment.Top;
-        MaxWidth = 430; Margin = new(8); AutomationProperties.SetName(this, "Find and replace graph text");
+        Width = 320; MaxWidth = 320; Margin = new(8); AutomationProperties.SetName(this, "Find and replace graph text");
         var panel = new StackPanel { Spacing = 7, Padding = new(10), MinWidth = 270 };
+        contentPanel = panel; ConstrainToViewport();
         var header = new Grid(); header.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         header.Children.Add(new TextBlock { Text = "Find / Replace", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
         var close = Button("Close", "Close", Close); Grid.SetColumn(close, 1); header.Children.Add(close); panel.Children.Add(header);
@@ -76,6 +77,8 @@ public sealed class GraphSearchControl : UserControl, IDisposable
             var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             foreach (var box in boxes) line.Children.Add(box); panel.Children.Add(line);
         }
+        foreach (var box in new[] { matchCase, wholeWord, includeIds, includeHidden, selectionOnly })
+        { box.MinHeight = 28; box.Height = 28; box.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent); }
         Options(matchCase, wholeWord); Options(includeIds, includeHidden);
         foreach (var (name, box) in new[] { ("Case", matchCase), ("Word", wholeWord), ("Ids", includeIds), ("Hidden", includeHidden) })
         { Register(name, box); box.Checked += (_, _) => RequestSearch(); box.Unchecked += (_, _) => RequestSearch(); }
@@ -88,13 +91,15 @@ public sealed class GraphSearchControl : UserControl, IDisposable
         var commands = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
         previous = Button("Previous", "Previous", () => FindNext(true)); next = Button("Next", "Next", () => FindNext());
         selectAll = Button("SelectAll", "Select matches", SelectMatches); commands.Children.Add(previous); commands.Children.Add(next); commands.Children.Add(selectAll); panel.Children.Add(commands);
+        // Status changes must not shift result navigation or replacement click targets.
+        summary.Height = 44; summary.TextTrimming = TextTrimming.CharacterEllipsis;
         Register("Results", rows); panel.Children.Add(summary); panel.Children.Add(rows);
         replacePanel.Children.Add(replacement);
         var replaceCommands = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
         replaceOne = Button("Replace", "Replace", () => Replace(false)); replaceAll = Button("ReplaceAll", "Replace all", () => Replace(true));
         replaceCommands.Children.Add(replaceOne); replaceCommands.Children.Add(replaceAll); replacePanel.Children.Add(replaceCommands); panel.Children.Add(replacePanel);
         panel.Children.Add(new TextBlock { Text = "Enter / F3: next · Shift+F3: previous · Esc: close\nIDs and locked owners are read-only. Literal text only.", FontSize = 10, TextWrapping = TextWrapping.Wrap });
-        Content = new Border { BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Gray), BorderThickness = new(1), Background = new SolidColorBrush(Microsoft.UI.Colors.White), Child = panel };
+        Content = new Border { BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Gray), BorderThickness = new(1), Background = new SolidColorBrush(Microsoft.UI.Colors.White), Child = new ScrollViewer { Content = panel, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
         query.TextChanged += (_, _) => RequestSearch(); debounce.Tick += async (_, _) => { debounce.Stop(); await SearchAsync(); };
         rows.SelectionChanged += (_, _) => { if (!binding) RevealCurrent(); UpdateCommands(); };
         KeyDown += Key; Unloaded += (_, _) => CancelPending(); UpdateCommands();
@@ -118,7 +123,7 @@ public sealed class GraphSearchControl : UserControl, IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this); Visibility = Visibility.Visible;
         replacePanel.Visibility = showReplacement ? Visibility.Visible : Visibility.Collapsed;
-        query.Focus(FocusState.Programmatic); query.SelectAll(); RequestSearch();
+        ConstrainToViewport(); query.Focus(FocusState.Programmatic); query.SelectAll(); RequestSearch();
     }
     public void Close() { CancelPending(); Visibility = Visibility.Collapsed; target?.Focus(FocusState.Programmatic); }
     private void CancelPending() { generation++; debounce.Stop(); cancellation?.Cancel(); cancellation?.Dispose(); cancellation = null; }
@@ -157,7 +162,9 @@ public sealed class GraphSearchControl : UserControl, IDisposable
     private void RevealCurrent()
     {
         if (!Current || rows.SelectedIndex < 0 || rows.SelectedIndex >= result!.Matches.Length) return;
-        var match = result.Matches[rows.SelectedIndex]; target!.RevealItem(match.ItemId);
+        var found = result; var control = target!; var match = found.Matches[rows.SelectedIndex];
+        RevealRequests++; control.RevealItem(match.ItemId);
+        if (!Current || !ReferenceEquals(result, found) || !ReferenceEquals(target, control)) return;
         if (!match.IsVisible) summary.Text = $"{result?.Matches.Length:N0} matches. Hidden match: showing its folded representative.";
     }
     public void FindNext(bool backward = false)
@@ -165,9 +172,14 @@ public sealed class GraphSearchControl : UserControl, IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         if (!Current) { Open(replacePanel.Visibility == Visibility.Visible); return; }
         if (result!.Matches.IsEmpty) return;
-        rows.SelectedIndex = (rows.SelectedIndex + (backward ? -1 : 1) + result.Matches.Length) % result.Matches.Length;
-        RevealCurrent();
-        if (Visibility == Visibility.Visible) rows.ScrollIntoView(rows.SelectedItem);
+        var found = result; var previousIndex = rows.SelectedIndex;
+        rows.SelectedIndex = (previousIndex + (backward ? -1 : 1) + result.Matches.Length) % result.Matches.Length;
+        // SelectionChanged performs the reveal for a changed index. A one-match cycle
+        // does not raise that event and still needs to reveal the current item.
+        if (!Current || !ReferenceEquals(result, found)) return;
+        if (rows.SelectedIndex == previousIndex) RevealCurrent();
+        if (Current && ReferenceEquals(result, found) && Visibility == Visibility.Visible && rows.SelectedItem is { } selectedRow)
+            rows.ScrollIntoView(selectedRow);
     }
     private void SelectMatches()
     {
@@ -197,7 +209,7 @@ public sealed class GraphSearchControl : UserControl, IDisposable
     private void Detach()
     {
         CancelPending(); if (target is null) return;
-        target.Document.Changed -= Changed; target.DocumentChanged -= Rebind; target.KeyDown -= TargetKey;
+        target.Document.Changed -= Changed; target.DocumentChanged -= Rebind; target.KeyDown -= TargetKey; target.SizeChanged -= TargetSizeChanged;
     }
     private void Key(object sender, KeyRoutedEventArgs args)
     {

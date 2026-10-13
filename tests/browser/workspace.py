@@ -5,10 +5,12 @@ import sys
 import traceback
 import subprocess
 from playwright.sync_api import sync_playwright
+from native_zoom import choose as choose_zoom
 
 url = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8080/VisualizeScene/?test=1'
 out = Path('artifacts/browser-workspace'); out.mkdir(parents=True, exist_ok=True)
 results, errors = [], []
+zoom_targets=[]
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, args=['--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--disable-dev-shm-usage'])
     page = browser.new_page(viewport={'width':1440, 'height':1050})
@@ -69,9 +71,7 @@ with sync_playwright() as p:
         click('Undo');wait('v.model.Graph.Nodes.length===10 && w.enabled.Redo')
         assert state()['model']==before
         record('Categorized amber tile palette creates the selected shape with exact undo')
-        click('ModeSelect');click('ZoomLevels');page.keyboard.press('Home')
-        for _ in range(3):page.keyboard.press('ArrowDown')
-        page.keyboard.press('Enter');wait('Math.abs(v.zoom-1)<1e-9')
+        click('ModeSelect');choose_zoom(page,3,zoom_targets);wait('Math.abs(v.zoom-1)<1e-9')
         record('Zoom combo applies an exact percentage and returns focus to graph')
         click('QuickFind');wait('v.search.open');click('SearchClose');wait('!v.search.open')
         record('Compact Find button opens the existing modeless search control')
@@ -96,7 +96,7 @@ with sync_playwright() as p:
         for name, fn in [('state',state),('workspace',ws)]:
             try:(out/(name+'.json')).write_text(json.dumps(fn(),indent=2))
             except Exception:pass
-        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno app, real input; SwiftShader is software rendering.'},indent=2))
+        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'zoomTargets':zoom_targets,'note':'Compiled Uno app, real input; SwiftShader is software rendering.'},indent=2))
         browser.close()
 if errors:
     sys.exit(1)
