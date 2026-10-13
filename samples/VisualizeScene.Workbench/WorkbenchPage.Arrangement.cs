@@ -49,6 +49,7 @@ public sealed partial class WorkbenchPage
     }
     private void UpdateArrangeMenu()
     {
+        UpdateGroupFoldingAvailability();
         foreach (var (command, item) in arrangeMenuItems)
             item.IsEnabled = arrangeToolbar is not null && GraphArrangeToolbar.CanExecute(command, arrangeToolbar.State);
     }

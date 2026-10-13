@@ -63,8 +63,7 @@ public sealed partial class GraphControl
         menu.Items.Add(new MenuFlyoutSeparator());
         Item("Group", "Group  Ctrl+G", session.Group, nodes.Length > 0 && nodes.All(n => n.ParentId == nodes[0].ParentId));
         Item("Ungroup", "Ungroup  Ctrl+Shift+G", session.Ungroup, groups.Length > 0);
-        Item("Fold", "Fold / unfold", () => owner.Edit("Fold selected groups", edit =>
-        { foreach (var group in groups) edit.Update(group with { Collapsed = !group.Collapsed }); }, revision), groups.Length > 0);
+        Item("Fold", "Fold / unfold", () => FoldGroups(GroupFoldOperation.Toggle), groups.Length > 0);
         Item("FitGroups", "Fit groups to children", () => ArrangeNodes(GraphArrangeCommand.FitGroups), groups.Any(n => GraphGroupSizing.CanFit(index, n)));
         Item("EnlargeGroups", "Enlarge groups to children", () => ArrangeNodes(GraphArrangeCommand.EnlargeGroups), groups.Any(n => GraphGroupSizing.CanFit(index, n)));
         menu.Items.Add(new MenuFlyoutSeparator());

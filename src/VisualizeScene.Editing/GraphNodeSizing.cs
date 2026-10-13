@@ -7,6 +7,8 @@ public enum NodeSizeMatch { Width, Height, Both }
 public readonly record struct GraphArrangeState(int SelectedNodes, int MovableRoots, int ResizableTargets, string? ReferenceId)
 {
     public int FittableGroups { get; init; }
+    public int ExpandableGroups { get; init; }
+    public int CollapsibleGroups { get; init; }
     /// <summary>Examines selected nodes and their ancestors, not unrelated scene geometry. A selected locked node may be a size reference.</summary>
     public static GraphArrangeState Calculate(GraphSnapshot graph, IEnumerable<string> itemIds, string? preferredReference = null,
         CancellationToken cancellationToken = default)
@@ -14,12 +16,13 @@ public readonly record struct GraphArrangeState(int SelectedNodes, int MovableRo
         ArgumentNullException.ThrowIfNull(graph); ArgumentNullException.ThrowIfNull(itemIds);
         cancellationToken.ThrowIfCancellationRequested(); var index = graph.Index();
         var selected = new HashSet<string>(StringComparer.Ordinal); var movable = new HashSet<string>(StringComparer.Ordinal);
-        string? reference = null; var fittable = 0;
+        string? reference = null; var fittable = 0; var expandable = 0; var collapsible = 0;
         foreach (var id in itemIds)
         {
             cancellationToken.ThrowIfCancellationRequested(); ArgumentNullException.ThrowIfNull(id);
             if (!index.Nodes.TryGetValue(id, out var node) || !index.IsVisible(id) || !selected.Add(id)) continue;
             if (GraphGroupSizing.CanFit(index, node)) fittable++;
+            if (node.IsGroup) { if (node.Collapsed) expandable++; else collapsible++; }
             reference ??= id; if (!node.Locked) movable.Add(id);
         }
         if (preferredReference is not null && selected.Contains(preferredReference)) reference = preferredReference;
@@ -37,7 +40,7 @@ public readonly record struct GraphArrangeState(int SelectedNodes, int MovableRo
             foreach (var ancestor in path) memo[ancestor] = owned;
             if (!owned) roots++;
         }
-        return new(selected.Count, roots, movable.Count - (reference is not null && movable.Contains(reference) ? 1 : 0), reference) { FittableGroups = fittable };
+        return new(selected.Count, roots, movable.Count - (reference is not null && movable.Contains(reference) ? 1 : 0), reference) { FittableGroups = fittable, ExpandableGroups = expandable, CollapsibleGroups = collapsible };
     }
 }
 
