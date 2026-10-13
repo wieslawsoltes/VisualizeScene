@@ -59,7 +59,7 @@ with sync_playwright() as p:
         click('MenuArrange'); click(name)
         # A command can publish the new graph before its native flyout finishes dismissing.
         # Wait for the actual menu item to unload, not an arbitrary extra sleep or a repeated click.
-        wait('!v.controls['+json.dumps(name)+']')
+        wait('!v.controls['+json.dumps(name)+'] && v.graphFocused')
     def undo(expected):
         revision = state()['revision']; click('Undo'); wait(f'v.revision==={revision+1}')
         assert state()['model'] == expected
@@ -93,6 +93,11 @@ with sync_playwright() as p:
         menu('Lower'); wait(f'v.revision==={revision+2}'); assert state()['model'] == baseline
         record('Arrange menu raises and lowers one layer while preserving every item record')
         menu('BringToFront'); wait('v.model.Graph.Nodes.at(-1).Id==="red"')
+        after_menu = state()['model']; revision = state()['revision']
+        page.keyboard.press('ArrowRight'); wait(f'v.revision==={revision+1}')
+        assert next(n for n in state()['model']['Graph']['Nodes'] if n['Id']=='red')['Bounds']['X']==1
+        undo(after_menu)
+        record('Drawing-order menu restores graph keyboard commands without an extra pointer click')
         page.mouse.click(*screen(30,60), button='right'); wait('w.contextOpen')
         page.screenshot(path=str(out/'drawing-order-context.png'))
         click('ContextOrderSendToBack'); wait('v.model.Graph.Nodes[0].Id==="red" && !w.contextOpen')

@@ -19,7 +19,7 @@ g['Ports'] = [{'Id': 'p', 'NodeId': 'b', 'RelativeLocation': {'X': 1, 'Y': .5}}]
 g['Labels'] = [{'Id': 'l', 'OwnerId': 'b', 'Text': 'Annotation', 'Offset': {'X': 0, 'Y': 95}, 'FontSize': 12}]
 fixture = out / 'fixture.json'; fixture.write_text(json.dumps({'Version': 1, 'Graph': g}))
 empty = out / 'empty.json'; empty.write_text(json.dumps({'Version': 1, 'Graph': {key: [] for key in g}}))
-results, errors = [], []
+results, errors, cache_checks = [], [], []
 commands = ['AlignLeft', 'AlignHorizontalCenter', 'AlignRight', 'AlignTop', 'AlignVerticalCenter', 'AlignBottom',
             'DistributeHorizontal', 'DistributeVertical', 'SameWidth', 'SameHeight', 'SameSize']
 with sync_playwright() as p:
@@ -110,8 +110,13 @@ with sync_playwright() as p:
         undo(sized); undo(baseline)
         record('The Arrange menu executes the same size command as the toolbar')
         record('Closing the Arrange menu restores graph keyboard input without an extra pointer click')
-        select('a', 'b', 'c'); page.wait_for_timeout(250); builds = arrange()['builds']; click('ZoomIn'); click('ZoomOut'); page.wait_for_timeout(250)
-        assert arrange()['builds'] == builds and state()['model'] == baseline
+        def current_arrangement():
+            wait('a.revision===v.revision && a.focus===v.navigationFocus && JSON.stringify(a.selection)===JSON.stringify(v.selection)')
+            return page.evaluate('({arrangement:globalThis.visualizeSceneArrange,model:globalThis.visualizeSceneState.model})')
+        select('a', 'b', 'c'); before_camera = current_arrangement()
+        click('ZoomIn'); click('ZoomOut'); after_camera = current_arrangement()
+        cache_checks.append({'before':before_camera['arrangement'],'after':after_camera['arrangement']})
+        assert after_camera['arrangement']['builds'] == before_camera['arrangement']['builds'] and after_camera['model'] == baseline, cache_checks[-1]
         record('Camera changes do not rebuild selection-aware arrangement availability')
         select('a', 'b'); page.set_viewport_size({'width': 640, 'height': 900}); wait('!w.leftVisible && !w.rightVisible')
         page.wait_for_timeout(250); revision = state()['revision']; click('ArrangeSameWidth'); wait(f'v.revision==={revision+1}')
@@ -131,7 +136,7 @@ with sync_playwright() as p:
     finally:
         try: (out/'state.json').write_text(json.dumps(state(), indent=2))
         except Exception: pass
-        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno, native pointer/keyboard input. SwiftShader software rendering; not physical GPU evidence.'},indent=2))
+        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'cacheChecks':cache_checks,'note':'Compiled Uno, native pointer/keyboard input. SwiftShader software rendering; not physical GPU evidence.'},indent=2))
         browser.close()
 if errors:
     sys.exit(1)
