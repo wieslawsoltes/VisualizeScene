@@ -115,6 +115,7 @@ Test("Hit testing: 10000 annotated nodes inspect only nearby candidates", () => 
 RendererCases.Run(Test);
 EdgeRenderingTests.Run(Test);
 CaptionMeasurementTests.Run(Test);
+PictureMemoryCases.Run(Test);
 Directory.CreateDirectory("artifacts/validation");
 File.WriteAllText("artifacts/validation/performance.xml", new XElement("testsuite", new XAttribute("name", "Performance contracts"),
     new XAttribute("tests", results.Count), new XAttribute("failures", results.Count(r => r.Error is not null)), results.Select(r =>

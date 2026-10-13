@@ -35,6 +35,7 @@ public sealed partial class GraphRenderer
         {
             using var shape = Shape(node); Use(SKColor.Parse(node.Fill)); canvas.DrawPath(shape, paint); Use(SKColor.Parse(node.Stroke), SKPaintStyle.Stroke, 1.5f); canvas.DrawPath(shape, paint); return;
         }
+        var retained = true;
         if (!pictures.TryGetValue(node.Id, out var cached) || !SameNodePictureStyle(node, cached.Style))
         {
             var style = node with { Bounds = new(0, 0, node.Bounds.Width, node.Bounds.Height), ParentId = null, Locked = false };
@@ -50,13 +51,14 @@ public sealed partial class GraphRenderer
             {
                 Use(SKColor.Parse(style.Stroke), SKPaintStyle.Stroke, 1.2f); target.DrawRect(new SKRect(8, 8, 20, 20), paint); target.DrawLine(11, 14, 17, 14, paint); if (style.Collapsed) target.DrawLine(14, 11, 14, 17, paint);
             }
-            var next = new NodePicture(style, recorder.EndRecording()); cached?.Picture.Dispose(); cached = next; nodeRecordings++;
-            if (pictureCacheCapacity > 0) pictures[node.Id] = cached;
+            var next = new NodePicture(style, recorder.EndRecording()); DropPicture(true, node.Id); cached = next; nodeRecordings++;
+            retained = RetainPicture(true, node.Id, cached.Picture);
+            if (retained) pictures.Add(node.Id, cached);
         }
-        if (pictureCacheCapacity > 0) TouchPicture(true, node.Id);
+        else TouchPicture(true, node.Id);
         var save = canvas.Save();
         try { canvas.Translate((float)node.Bounds.X, (float)node.Bounds.Y); canvas.DrawPicture(cached.Picture); }
-        finally { canvas.RestoreToCount(save); if (pictureCacheCapacity == 0) cached.Picture.Dispose(); }
+        finally { canvas.RestoreToCount(save); if (!retained) cached.Picture.Dispose(); }
     }
     private void DrawEdge(SKCanvas canvas, EdgePicture edge, double zoom, RenderOptions options)
     {
@@ -64,7 +66,7 @@ public sealed partial class GraphRenderer
         edgePainter.Draw(canvas, edge.Edge, edge.Points, edge.Path, zoom, selected, options.Overview);
         if (!options.Overview && zoom >= .35 && edge.Edge.Text.Length > 0)
         {
-            var position = Geometry.PointAtFraction(edge.Points, .5); DrawText(canvas, edge.Edge.Text, position + new PointD(0, -9), 11, 220, 50, true);
+            DrawText(canvas, edge.Edge.Text, Geometry.PointAtFraction(edge.Points, .5) + new PointD(0, -9), 11, 220, 50, true);
         }
     }
     private void DrawLabels(SKCanvas canvas, GraphSnapshot snapshot, RectD view)

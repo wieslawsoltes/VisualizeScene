@@ -7,6 +7,7 @@ public sealed record GraphDocumentChangedEventArgs(GraphDocument Previous, Graph
 public sealed partial class GraphControl
 {
     public int PictureCacheCapacity { get => renderer.PictureCacheCapacity; set { renderer.PictureCacheCapacity = value; Invalidate(); } }
+    public long PictureCacheByteBudget { get => renderer.PictureCacheByteBudget; set { renderer.PictureCacheByteBudget = value; Invalidate(); } }
     public VisualizeScene.Rendering.Skia.PictureCacheStatistics PictureStatistics => renderer.PictureStatistics;
     private GraphSnapshot? boundsSnapshot;
     private RectD contentBounds;
