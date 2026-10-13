@@ -12,6 +12,7 @@ void Check(bool condition, string message)
     if (!condition) throw new InvalidOperationException(message);
     Console.WriteLine("PASS " + message);
 }
+RenderingCacheApi.Verify();
 var document = new GraphDocument();
 document.Edit("Package consumer", edit =>
 {

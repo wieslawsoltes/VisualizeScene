@@ -39,7 +39,7 @@ public sealed partial class WorkbenchPage
         var view = Menu("View"); Item(view, "Fit graph  Home", graph.Fit); Item(view, "Zoom in", () => graph.Zoom(1.25)); Item(view, "Zoom out", () => graph.Zoom(.8)); Item(view, "Toggle grid", () => { graph.Session.ShowGrid = !graph.Session.ShowGrid; graph.Invalidate(); }); Item(view, "Toggle grid snapping", () => graph.Session.SnapToGrid = !graph.Session.SnapToGrid, "ToggleGridSnap");
         var snapItems = new ToggleMenuFlyoutItem { Text = "Alignment guides", IsChecked = graph.Session.SnapToItems };
         Register("ToggleItemSnap", snapItems); snapItems.Click += (_, _) => graph.Session.SnapToItems = snapItems.IsChecked; view.Items.Add(snapItems);
-        AddNavigationMenu(view);
+        AddNavigationMenu(view); AddRenderingMenu(view);
         var arrange = Menu("Arrange"); Item(arrange, "Group  Ctrl+G", graph.Session.Group); Item(arrange, "Ungroup  Ctrl+Shift+G", graph.Session.Ungroup); Item(arrange, "Fold / unfold selected groups", FoldSelected);
         AddGroupFoldingMenu(arrange);
         arrange.Items.Add(new MenuFlyoutSeparator()); AddArrangeCommands(arrange);
