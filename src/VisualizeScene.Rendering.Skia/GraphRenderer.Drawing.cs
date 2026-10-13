@@ -66,7 +66,7 @@ public sealed partial class GraphRenderer
         edgePainter.Draw(canvas, edge.Edge, edge.Points, edge.Path, zoom, selected, options.Overview);
         if (!options.Overview && zoom >= .35 && edge.Edge.Text.Length > 0)
         {
-            DrawText(canvas, edge.Edge.Text, Geometry.PointAtFraction(edge.Points, .5) + new PointD(0, -9), 11, 220, 50, true);
+            DrawEdgeCaptionPicture(canvas, edge);
         }
     }
     private void DrawLabels(SKCanvas canvas, GraphSnapshot snapshot, RectD view)

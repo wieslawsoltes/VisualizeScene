@@ -31,6 +31,7 @@ public sealed partial class GraphRenderer
             foreach (var edge in snapshot.Edges)
                 if (!previousIndex!.Edges.TryGetValue(edge.Id, out var old) || old.Text != edge.Text) { changed = true; break; }
         if (!changed) return;
+        PruneEdgeCaptionPictures();
         var items = new List<(RectD Bounds, string Id)>();
         foreach (var edge in snapshot.Edges)
         {

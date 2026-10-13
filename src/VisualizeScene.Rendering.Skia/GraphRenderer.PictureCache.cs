@@ -9,23 +9,27 @@ public readonly record struct PictureCacheStatistics(int Retained, int Capacity,
     public long EstimatedRetainedBytes { get; init; }
     public long ByteBudget { get; init; }
     public long OversizedBypasses { get; init; }
+    public long EdgeCaptionRecordings { get; init; }
+    public int RetainedEdgeCaptions { get; init; }
 }
 
 public sealed partial class GraphRenderer
 {
     private sealed record LabelPicture(string Text, double Size, PointD Center, SKPicture Picture);
-    private sealed record PictureUse(bool Node, string Id, long EstimatedBytes);
+    private enum PictureKind { Node, Label, EdgeCaption }
+    private sealed record PictureUse(PictureKind Kind, string Id, long EstimatedBytes);
     private readonly Dictionary<string, LabelPicture> labelPictures = new(StringComparer.Ordinal);
     private readonly LinkedList<PictureUse> pictureLru = new();
-    private readonly Dictionary<(bool Node, string Id), LinkedListNode<PictureUse>> pictureUses = [];
+    private readonly Dictionary<(PictureKind Kind, string Id), LinkedListNode<PictureUse>> pictureUses = [];
     private int pictureCacheCapacity = 4096;
     private long pictureCacheByteBudget = 16L * 1024 * 1024;
     private long retainedPictureBytes, oversizedPictureBypasses;
     private long nodeRecordings, labelRecordings, pictureEvictions;
     public PictureCacheStatistics PictureStatistics => new(pictureLru.Count, pictureCacheCapacity, nodeRecordings, labelRecordings, pictureEvictions)
-    { EstimatedRetainedBytes = retainedPictureBytes, ByteBudget = pictureCacheByteBudget, OversizedBypasses = oversizedPictureBypasses };
+    { EstimatedRetainedBytes = retainedPictureBytes, ByteBudget = pictureCacheByteBudget, OversizedBypasses = oversizedPictureBypasses,
+        EdgeCaptionRecordings = edgeCaptionRecordings, RetainedEdgeCaptions = edgeCaptionPictures.Count };
 
-    /// <summary>Combined node/label picture entry budget. Zero disables retention.</summary>
+    /// <summary>Combined node/label/edge-caption picture entry budget. Zero disables retention.</summary>
     public int PictureCacheCapacity
     {
         get => pictureCacheCapacity;
@@ -50,34 +54,38 @@ public sealed partial class GraphRenderer
         }
     }
     private bool PictureRetentionEnabled => pictureCacheCapacity > 0 && pictureCacheByteBudget > 0;
-    private void TouchPicture(bool node, string id)
+    private void TouchPicture(bool node, string id) => TouchPicture(node ? PictureKind.Node : PictureKind.Label, id);
+    private void TouchPicture(PictureKind kind, string id)
     {
-        var entry = pictureUses[(node, id)]; pictureLru.Remove(entry); pictureLru.AddLast(entry);
+        var entry = pictureUses[(kind, id)]; pictureLru.Remove(entry); pictureLru.AddLast(entry);
     }
     // Only called for a new picture after removing an older entry with the same key.
     // Evict BEFORE registration so an oversized incoming picture is never disposed before replay.
-    private bool RetainPicture(bool node, string id, SKPicture picture)
+    private bool RetainPicture(bool node, string id, SKPicture picture) => RetainPicture(node ? PictureKind.Node : PictureKind.Label, id, picture);
+    private bool RetainPicture(PictureKind kind, string id, SKPicture picture)
     {
         if (!PictureRetentionEnabled) return false;
         var bytes = Math.Max(1L, (long)picture.ApproximateBytesUsed);
         if (bytes > pictureCacheByteBudget) { oversizedPictureBypasses++; return false; }
         while ((pictureLru.Count >= pictureCacheCapacity || retainedPictureBytes > pictureCacheByteBudget - bytes) && pictureLru.First is { } first)
-            DropPicture(first.Value.Node, first.Value.Id, evicted: true);
-        var use = new LinkedListNode<PictureUse>(new(node, id, bytes));
-        pictureUses.Add((node, id), use); pictureLru.AddLast(use); retainedPictureBytes += bytes;
+            DropPicture(first.Value.Kind, first.Value.Id, evicted: true);
+        var use = new LinkedListNode<PictureUse>(new(kind, id, bytes));
+        pictureUses.Add((kind, id), use); pictureLru.AddLast(use); retainedPictureBytes += bytes;
         return true;
     }
-    private void DropPicture(bool node, string id, bool evicted = false)
+    private void DropPicture(bool node, string id, bool evicted = false) => DropPicture(node ? PictureKind.Node : PictureKind.Label, id, evicted);
+    private void DropPicture(PictureKind kind, string id, bool evicted = false)
     {
-        if (node) { if (pictures.Remove(id, out var entry)) entry.Picture.Dispose(); }
-        else { if (labelPictures.Remove(id, out var entry)) entry.Picture.Dispose(); }
-        if (pictureUses.Remove((node, id), out var use))
+        if (kind == PictureKind.Node) { if (pictures.Remove(id, out var entry)) entry.Picture.Dispose(); }
+        else if (kind == PictureKind.Label) { if (labelPictures.Remove(id, out var entry)) entry.Picture.Dispose(); }
+        else { if (edgeCaptionPictures.Remove(id, out var entry)) entry.Picture.Dispose(); }
+        if (pictureUses.Remove((kind, id), out var use))
         { pictureLru.Remove(use); retainedPictureBytes -= use.Value.EstimatedBytes; if (evicted) pictureEvictions++; }
     }
     private void TrimPictures()
     {
         while ((pictureLru.Count > pictureCacheCapacity || retainedPictureBytes > pictureCacheByteBudget) && pictureLru.First is { } first)
-            DropPicture(first.Value.Node, first.Value.Id, evicted: true);
+            DropPicture(first.Value.Kind, first.Value.Id, evicted: true);
     }
     private void DrawLabelPicture(SKCanvas canvas, LabelVisual visual)
     {
@@ -107,6 +115,7 @@ public sealed partial class GraphRenderer
     {
         foreach (var entry in pictures.Values) entry.Picture.Dispose(); pictures.Clear();
         foreach (var entry in labelPictures.Values) entry.Picture.Dispose(); labelPictures.Clear();
+        foreach (var entry in edgeCaptionPictures.Values) entry.Picture.Dispose(); edgeCaptionPictures.Clear();
         pictureUses.Clear(); pictureLru.Clear(); retainedPictureBytes = 0;
     }
 }
