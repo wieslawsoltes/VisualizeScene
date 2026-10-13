@@ -72,6 +72,10 @@ The Fold toolbar and context command now process a multiselection as **one undoa
 transaction**. The Arrange menu also offers explicit **Expand selected groups** and
 **Collapse selected groups**, with selection-aware availability. See [group folding](docs/group-folding.md).
 
+### Grid preferences
+
+Use **View → Grid settings…** to stage rectangular spacing/origin, dots/crosses/line styles, color/thickness, independent snapping axes and optional node-center snapping. Apply commits view preferences; Cancel/Escape and staged Reset leave graph data and undo history alone. The grid renderer reuses bounded native geometry and no longer inserts misleading intermediate points at high zoom. [Grid APIs, contracts and limitations](docs/grid-preferences.md).
+
 ### Graph Find and Replace
 
 Use **Edit → Find graph text / Replace graph text**, or Ctrl+F / Ctrl+H while the graph
@@ -100,7 +104,7 @@ separately from per-frame view state.
 
 [Navigation contracts](docs/navigation.md) and [performance methodology](docs/performance.md)
 describe the APIs, validation and limits. Same-runner benchmark reports compare the
-current implementation with pinned group-fitting baseline commit `5899c3d9`; they are CPU/raster
+current implementation with pinned pre-grid baseline commit `401df2f5`; they are CPU/raster
 measurements, not physical-GPU throughput or a promise of fixed frame rates.
 
 ## Reusable packages
@@ -167,6 +171,7 @@ dotnet run --project tests/VisualizeScene.Navigation.Tests -c Release
 dotnet run --project tests/VisualizeScene.Search.Tests -c Release
 # Linux native Skia/HarfBuzz assets are supplied by the performance test project:
 dotnet run --project tests/VisualizeScene.Performance.Tests -c Release
+dotnet run --project tests/VisualizeScene.Grid.Tests -c Release
 
 dotnet run --project samples/VisualizeScene.Workbench -f net10.0-desktop
 dotnet publish samples/VisualizeScene.Workbench -c Release -f net10.0-browserwasm
@@ -187,7 +192,7 @@ A standalone Linux rendering host must provide the matching SkiaSharp and HarfBu
 
 `Build and validate` runs core conformance, editing/geometry, placement/snapping/selection and bounded text-layout regressions, builds desktop, publishes the actual Uno WebAssembly application, packages the controls, and runs Playwright pointer/keyboard tests against that application. Artifacts include source, NuGet packages, browser distribution, test reports and screenshots.
 
-The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. Ten browser entry points cover the classic workspace and compact property grid; baseline interactions; ports, reconnection and independent labels; automatic placement and snapping; advanced selection; literal Find/Replace; touch/keyboard navigation; a 10,000-node performance fixture; layouts, analysis, exports, file round trips and all sample graphs; and arrangement/sizing tools. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
+The browser test's optional `?test=1` snapshot is read-only. Tests create, move, resize, duplicate, delete, connect and group graph items through actual input; they do not call a parallel model or mutation API. Thirteen browser entry points cover the classic workspace and compact property grid; baseline interactions; ports, reconnection and independent labels; automatic placement and snapping; advanced selection; literal Find/Replace; touch/keyboard navigation; a 10,000-node performance fixture; layouts, analysis, exports, file round trips and all sample graphs; arrangement/sizing tools; measured caption fitting; rendering-cache controls; and staged grid preferences. File-import automation exercises Uno’s upload-picker fallback; the native operating-system file dialog is not automated. See [browser validation](tests/browser/README.md). The core tests exercise this project's contracts, not the whole yFiles commercial SDK.
 
 ## Documentation
 

@@ -103,6 +103,17 @@ Measure("render_cold_local", () => { using var cold = new GraphRenderer(); cold.
 Measure("index_new_snapshot", () => sink = (graph with { }).Index(), samples: 12);
 renderer.Render(surface.Canvas, graph, viewport, 800, 400, options);
 using var image = surface.Snapshot(); using var bitmap = SKBitmap.FromImage(image);
+// Same public renderer API in both revisions; separate the grid-only warm/pan/cold paths.
+using var gridRenderer = new GraphRenderer();
+using var gridSurface = SKSurface.Create(new SKImageInfo(800, 400)) ?? throw new Exception("No grid raster surface");
+var gridView = new Viewport(); var gridOptions = new RenderOptions();
+Measure("grid_warm_800x400", () => gridRenderer.Render(gridSurface.Canvas, GraphSnapshot.Empty, gridView, 800, 400, gridOptions), batch: 10);
+var gridPan = false;
+Measure("grid_pan_800x400", () => { gridPan = !gridPan; gridView.Restore(new(new(gridPan ? 5 : 0, 0), 1));
+    gridRenderer.Render(gridSurface.Canvas, GraphSnapshot.Empty, gridView, 800, 400, gridOptions); }, batch: 10);
+Measure("grid_cold_800x400", () => { using var cold = new GraphRenderer(); cold.Render(gridSurface.Canvas, GraphSnapshot.Empty, gridView, 800, 400, gridOptions); }, samples: 20);
+gridView.Restore(new(new(), 1)); gridRenderer.Render(gridSurface.Canvas, GraphSnapshot.Empty, gridView, 800, 400, gridOptions);
+using var gridImage = gridSurface.Snapshot(); using var gridBitmap = SKBitmap.FromImage(gridImage);
 // A separately measured, fully visible caption-heavy fixture isolates warm text shaping costs.
 var captionNodes = Enumerable.Range(0, 20).Select(i => new GraphNode("cn" + i,
     new((i % 4) switch { 0 => 10, 1 => 340, 2 => 410, _ => 740 }, i / 4 * 70 + 10, 45, 40), "N")).ToImmutableArray();
@@ -128,7 +139,7 @@ var report = new { revision = args[1], runtime = RuntimeInformation.FrameworkDes
     processors = Environment.ProcessorCount, nodes = count, edges = edges.Length, ports = count, labels = count, viewport = new { width = 800, height = 400, zoom = 1 },
     note = "Same-source, same-runner CPU/raster comparison. Full collection after warm-up before each workload in both revisions. Warm operation timings and current-thread managed allocation only; not hardware GPU/FPS/input-latency measurements. Cold render includes construction/disposal with shared model already warmed. Scene bounds use fixed 80x20 label metrics; its allocation includes boxing the rectangle result into the sink.",
     pixelSha256 = Convert.ToHexString(SHA256.HashData(bitmap.Bytes)),
-    captionPixelSha256 = Convert.ToHexString(SHA256.HashData(captionBitmap.Bytes)), results };
+    captionPixelSha256 = Convert.ToHexString(SHA256.HashData(captionBitmap.Bytes)), gridPixelSha256 = Convert.ToHexString(SHA256.HashData(gridBitmap.Bytes)), results };
 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[0]))!);
 File.WriteAllText(args[0], JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
 GC.KeepAlive(sink);

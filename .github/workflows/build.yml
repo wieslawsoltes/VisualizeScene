@@ -31,6 +31,8 @@ jobs:
         run: dotnet run --project tests/VisualizeScene.Rendering.Tests -c Release
       - name: Performance correctness and allocation contracts
         run: dotnet run --project tests/VisualizeScene.Performance.Tests -c Release
+      - name: Grid geometry, input and native rendering contracts
+        run: dotnet run --project tests/VisualizeScene.Grid.Tests -c Release
       - name: Graph search and cold-index contracts
         run: dotnet run --project tests/VisualizeScene.Search.Tests -c Release
       - name: Overview rendering and structure contracts
@@ -61,7 +63,7 @@ jobs:
           path: artifacts/source
   app:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -120,6 +122,9 @@ jobs:
       - name: Browser native rendering-cache presets
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/rendering_cache.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Browser staged native grid settings
+        if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
+        run: python tests/browser/grid.py http://127.0.0.1:8080/VisualizeScene/?test=1
       - name: Browser graph Find and Replace
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/search.py http://127.0.0.1:8080/VisualizeScene/?test=1
