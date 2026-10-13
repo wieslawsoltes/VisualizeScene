@@ -39,11 +39,7 @@ public sealed partial class WorkbenchPage
         row.Children.Add(Separator()); Add(EditorIconKind.Group, "Group", "Group selection · Ctrl+G", graph.Session.Group); Add(EditorIconKind.Fold, "Fold", "Fold / unfold groups", FoldSelected);
         row.Children.Add(Separator()); Add(EditorIconKind.ZoomOut, "ZoomOut", "Zoom out", () => graph.Zoom(.8)); Add(EditorIconKind.Fit, "Fit", "Fit content · Home", graph.Fit); Add(EditorIconKind.ZoomIn, "ZoomIn", "Zoom in", () => graph.Zoom(1.25));
         Register("ZoomLevels", zoomLevels); row.Children.Add(zoomLevels);
-        zoomLevels.SelectionChanged += (_, _) =>
-        {
-            if (updatingZoom || zoomLevels.SelectedItem is not string value) return;
-            graph.Zoom(double.Parse(value.TrimEnd('%'), CultureInfo.InvariantCulture) / 100 / graph.Session.Viewport.Zoom); graph.Focus(FocusState.Programmatic);
-        };
+        InitializeZoomSelection();
         row.Children.Add(Separator()); Add(EditorIconKind.Layout, "QuickLayout", "Apply chosen layout", () => _ = ApplyLayout()); Add(EditorIconKind.Search, "QuickFind", "Find graph text · Ctrl+F", () => search.Open());
         row.Children.Add(Separator()); samples.MinWidth = 180; samples.MinHeight = 26; Register("Samples", samples); row.Children.Add(samples);
         return new ScrollViewer { Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Background = Brush("#F0F1F2") };

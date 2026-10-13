@@ -38,6 +38,7 @@ public sealed partial class WorkbenchPage
     {
 #if __WASM__
         if (!DiagnosticsEnabled || arrangeToolbar is null) return;
+        PublishZoomChoice();
         // Read-only native dropdown state lets tests wait for actual open/close rather than guessing animation delays.
         Uno.Foundation.WebAssemblyRuntime.InvokeJS($"globalThis.visualizeSceneLayout={{kind:{layoutKind.SelectedIndex},open:{(layoutKind.IsDropDownOpen ? "true" : "false")},direction:{direction.SelectedIndex},directionOpen:{(direction.IsDropDownOpen ? "true" : "false")}}};");
         var state = arrangeToolbar.State;

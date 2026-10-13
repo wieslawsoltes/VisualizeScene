@@ -5,6 +5,7 @@ import subprocess
 import sys
 import traceback
 from playwright.sync_api import sync_playwright
+from native_zoom import choose as choose_zoom
 
 url = sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:8080/VisualizeScene/?test=1'
 density = int(sys.argv[2]) if len(sys.argv)>2 else 1
@@ -14,7 +15,7 @@ g={'Nodes':[{'Id':f'n{i}','Bounds':{'X':i%40*300-4000,'Y':i//40*300-3000,'Width'
     'Text':f'Node {i}','Shape':'RoundedRectangle','Fill':'#DDEBFA','Stroke':'#4778A5'} for i in range(800)],'Edges':[],'Ports':[],'Labels':[]}
 fixture=out/'fixture.json';fixture.write_text(json.dumps({'Version':1,'Graph':g}))
 empty=out/'empty.json';empty.write_text(json.dumps({'Version':1,'Graph':{key:[] for key in g}}))
-results,errors=[],[]
+results,errors,zoom_targets=[],[],[]
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True,args=['--enable-unsafe-swiftshader','--use-angle=swiftshader','--disable-dev-shm-usage'])
     page=browser.new_page(viewport={'width':1440,'height':1050},device_scale_factor=density)
@@ -40,9 +41,8 @@ with sync_playwright() as p:
         with page.expect_file_chooser() as chooser:click('Open')
         chooser.value.set_files(str(path))
     def unit_zoom():
-        click('ZoomLevels');page.keyboard.press('Home')
-        for _ in range(3):page.keyboard.press('ArrowDown')
-        page.keyboard.press('Enter');wait('Math.abs(v.zoom-1)<1e-9 && s.horizontal.enabled && s.vertical.enabled');page.wait_for_timeout(200)
+        choose_zoom(page,3,zoom_targets)
+        wait('Math.abs(v.zoom-1)<1e-9 && s.horizontal.enabled && s.vertical.enabled');page.wait_for_timeout(200)
     def record(name):
         assert not state()['error'],state()['error']
         assert state()['revision']==revision and state()['model']==baseline,'Viewport input mutated graph data'
@@ -57,6 +57,9 @@ with sync_playwright() as p:
         bounds('GraphHThumb');bounds('GraphVThumb')
         page.screenshot(path=str(out/'desktop-scrollbars.png'))
         record('Native scrollbars and their hit targets stay within compact graph rails')
+        for choice, expected in [(0,.25),(4,1.5),(3,1)]:
+            choose_zoom(page,choice,zoom_targets);wait(f'Math.abs(v.zoom-({expected}))<1e-9')
+        record('Native zoom choices close and restore graph focus across successive keyboard selections')
         click('GraphHThumb');prior=state();maximum=scroll()['horizontal']['max'];page.keyboard.press('End')
         wait(f'Math.abs(v.origin.x-({maximum}))<1e-6')
         assert state()['zoom']==prior['zoom'] and state()['origin']['y']==prior['origin']['y']
@@ -121,7 +124,7 @@ with sync_playwright() as p:
         for name,fn in [('state',state),('scroll',scroll)]:
             try:(out/(name+'.json')).write_text(json.dumps(fn(),indent=2))
             except Exception:pass
-        (out/'report.json').write_text(json.dumps({'density':density,'results':results,'errors':errors,'note':'Actual Uno pointer/keyboard input; SwiftShader software rendering, not physical GPU evidence.'},indent=2))
+        (out/'report.json').write_text(json.dumps({'density':density,'results':results,'errors':errors,'zoomTargets':zoom_targets,'note':'Actual Uno pointer/keyboard input; SwiftShader software rendering, not physical GPU evidence.'},indent=2))
         browser.close()
 if errors:
     sys.exit(1)
