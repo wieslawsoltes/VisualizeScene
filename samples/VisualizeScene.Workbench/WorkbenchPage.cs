@@ -93,6 +93,6 @@ public sealed partial class WorkbenchPage : Page
     }
     private void FoldSelected()
     {
-        foreach (var id in graph.Session.Selection.ToArray()) if (document.Snapshot.Index().Nodes.TryGetValue(id, out var n) && n.IsGroup) graph.Session.ToggleGroup(id);
+        graph.FoldGroups(GroupFoldOperation.Toggle);
     }
 }

@@ -88,4 +88,7 @@ with sync_playwright() as p:
         except Exception:pass
         (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'contextTargets':context_targets,'note':'Compiled Uno with native pointer, keyboard and file input; SwiftShader software rendering.'},indent=2))
         browser.close()
-sys.exit(1 if errors else 0)
+if errors:
+    sys.exit(1)
+import subprocess
+sys.exit(subprocess.run([sys.executable, str(Path(__file__).with_name("group_folding.py")), url], check=False).returncode)
