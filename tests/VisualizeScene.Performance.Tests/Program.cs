@@ -41,7 +41,7 @@ Test("Index: deep hierarchy resolves outermost folding without recursive travers
     var nodes = Enumerable.Range(0, 10000).Select(i => new GraphNode("n" + i, new(0, 0, 100, 60),
         ParentId: i == 0 ? null : "n" + (i - 1), IsGroup: true, Collapsed: i is 5 or 500)).Reverse().ToImmutableArray();
     var index = new GraphSnapshot(nodes, [], [], []).Index();
-    Cases.Check(index.VisibleRepresentative("n9999") == "n5" && index.Depth("n9999") == 9999 && index.IsVisible("n5"));
+    Cases.Check(index.VisibleRepresentative("n9999") == "n5" && index.Depth("n9999")==9999 && index.IsVisible("n5"));
 });
 Test("Index: weak revision caches do not retain retired snapshots", () => {
     var weak = Cases.Retired();
@@ -114,6 +114,7 @@ Test("Hit testing: 10000 annotated nodes inspect only nearby candidates", () => 
 });
 RendererCases.Run(Test);
 EdgeRenderingTests.Run(Test);
+CaptionMeasurementTests.Run(Test);
 Directory.CreateDirectory("artifacts/validation");
 File.WriteAllText("artifacts/validation/performance.xml", new XElement("testsuite", new XAttribute("name", "Performance contracts"),
     new XAttribute("tests", results.Count), new XAttribute("failures", results.Count(r => r.Error is not null)), results.Select(r =>

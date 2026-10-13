@@ -64,6 +64,7 @@ public sealed partial class GraphControl : ContentControl, IDisposable
     {
         AttachNavigation();
         Session.LabelSizeProvider = label => renderer.MeasureLabel(label);
+        Session.NodeCaptionSizeProvider = renderer.MeasureNodeCaption;
         Session.Invalidated += (_, _) => Invalidate(); Session.SelectionChanged += (_, _) => { CloseGraphContextMenu(); SelectionChanged?.Invoke(this, EventArgs.Empty); }; Session.StatusChanged += (_, text) => { CloseGraphContextMenu(); StatusChanged?.Invoke(this, text); };
     }
     public void Invalidate() { if (!disposed) surface.Invalidate(); }

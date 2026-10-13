@@ -45,7 +45,7 @@ public sealed partial class GraphRenderer
             {
                 Use(new SKColor(221, 232, 243)); target.DrawRoundRect(new SKRect(1, 1, (float)style.Bounds.Width - 1, 28), 5, 5, paint); DrawText(target, style.Text, new(style.Bounds.Width / 2, 14), 12, Math.Max(0, style.Bounds.Width - 34));
             }
-            else DrawText(target, style.Text, style.Bounds.Center, 13, style.Bounds.Width * (style.Shape == NodeShape.Diamond ? .6 : .82), Math.Max(0, style.Bounds.Height - 10));
+            else DrawText(target, style.Text, style.Bounds.Center, NodeCaptionLayout.FontSize, style.Bounds.Width * NodeCaptionLayout.WidthFraction(style.Shape), Math.Max(0, style.Bounds.Height - NodeCaptionLayout.HeightInset));
             if (style.IsGroup)
             {
                 Use(SKColor.Parse(style.Stroke), SKPaintStyle.Stroke, 1.2f); target.DrawRect(new SKRect(8, 8, 20, 20), paint); target.DrawLine(11, 14, 17, 14, paint); if (style.Collapsed) target.DrawLine(14, 11, 14, 17, paint);

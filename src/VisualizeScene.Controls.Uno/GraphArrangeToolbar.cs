@@ -14,7 +14,7 @@ namespace VisualizeScene.Controls.Uno;
 public enum GraphArrangeCommand
 {
     AlignLeft, AlignHorizontalCenter, AlignRight, AlignTop, AlignVerticalCenter, AlignBottom,
-    DistributeHorizontal, DistributeVertical, SameWidth, SameHeight, SameSize, FitGroups, EnlargeGroups
+    DistributeHorizontal, DistributeVertical, SameWidth, SameHeight, SameSize, FitGroups, EnlargeGroups, FitNodeText
 }
 
 /// <summary>Compact reusable arrangement commands. Availability is cached by nodes, selection and keyboard focus, never per frame.</summary>
@@ -63,6 +63,12 @@ public sealed class GraphArrangeToolbar : StackPanel, IDisposable
                         Line(17, 17, 14, 17); Line(17, 17, 17, 14);
                     }
                 }
+                else if (command == GraphArrangeCommand.FitNodeText)
+                {
+                    Line(1, 5, 1, 1); Line(1, 1, 5, 1); Line(13, 1, 17, 1); Line(17, 1, 17, 5);
+                    Line(1, 13, 1, 17); Line(1, 17, 5, 17); Line(13, 17, 17, 17); Line(17, 17, 17, 13);
+                    Line(5, 5, 13, 5); Line(9, 5, 9, 13); Line(6, 13, 12, 13);
+                }
                 else
                 {
                     if (command == GraphArrangeCommand.SameHeight) canvas.RotateDegrees(90, 9, 9);
@@ -110,6 +116,7 @@ public sealed class GraphArrangeToolbar : StackPanel, IDisposable
         GraphArrangeCommand.SameWidth => "Make same width", GraphArrangeCommand.SameHeight => "Make same height", GraphArrangeCommand.SameSize => "Make same size",
         GraphArrangeCommand.FitGroups => "Fit groups to children",
         GraphArrangeCommand.EnlargeGroups => "Enlarge groups to children",
+        GraphArrangeCommand.FitNodeText => "Fit nodes to text",
         _ => throw new ArgumentOutOfRangeException(nameof(command))
     };
     public static bool CanExecute(GraphArrangeCommand command, GraphArrangeState state) => command switch
@@ -119,6 +126,7 @@ public sealed class GraphArrangeToolbar : StackPanel, IDisposable
         GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.DistributeVertical => state.MovableRoots >= 3,
         GraphArrangeCommand.SameWidth or GraphArrangeCommand.SameHeight or GraphArrangeCommand.SameSize => state.ResizableTargets >= 1,
         GraphArrangeCommand.FitGroups or GraphArrangeCommand.EnlargeGroups => state.FittableGroups > 0,
+        GraphArrangeCommand.FitNodeText => state.CaptionFittableNodes > 0,
         _ => false
     };
     public GraphArrangeToolbar()
