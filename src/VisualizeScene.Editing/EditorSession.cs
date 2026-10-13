@@ -39,9 +39,6 @@ public sealed partial class EditorSession : IDisposable
     public string DefaultFill { get; set; } = "#DDEBFA";
     public string DefaultStroke { get; set; } = "#4778A5";
     public string DefaultText { get; set; } = "Node";
-    public bool SnapToGrid { get; set; } = true;
-    public double GridSize { get; set; } = 10;
-    public bool ShowGrid { get; set; } = true;
     public RectD? Marquee { get; private set; }
     public (PointD Start, PointD End)? EdgePreview { get; private set; }
     public event EventHandler? Invalidated;
@@ -71,15 +68,11 @@ public sealed partial class EditorSession : IDisposable
     public void Invalidate() => Invalidated?.Invoke(this, EventArgs.Empty);
     public void Select(IEnumerable<string> ids, bool additive = false)
         => ApplySelection(ids, additive ? SelectionOperation.Add : SelectionOperation.Replace);
-    public PointD Snap(PointD point)
-    {
-        if (!SnapToGrid) return point;
-        if (!double.IsFinite(GridSize) || GridSize <= 0) throw new InvalidOperationException("Grid size must be finite and positive.");
-        return new(Math.Round(point.X / GridSize) * GridSize, Math.Round(point.Y / GridSize) * GridSize);
-    }
     public string AddNode(PointD center)
     {
-        var position = Snap(center - new PointD(65, 28)); var id = GraphEdit.NewId();
+        var halfSize = new PointD(65, 28);
+        var position = gridSettings.NodeAnchor == GridNodeAnchor.Center ? Snap(center) - halfSize : Snap(center - halfSize);
+        var id = GraphEdit.NewId();
         Document.Edit("Create node", e => e.Add(new GraphNode(id, new(position.X, position.Y, 130, 56), DefaultText, DefaultShape, DefaultFill, DefaultStroke)));
         Select([id]); return id;
     }

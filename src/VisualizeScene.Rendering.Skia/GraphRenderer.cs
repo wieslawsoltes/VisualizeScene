@@ -6,7 +6,11 @@ using VisualizeScene.Core;
 namespace VisualizeScene.Rendering.Skia;
 
 public sealed record RenderOptions(bool ShowGrid = true, double GridSize = 10, IReadOnlySet<string>? Selection = null,
-    RectD? Marquee = null, (PointD Start, PointD End)? EdgePreview = null, bool Overview = false, PointD? CandidatePosition = null, bool IsValidConnection = true, IReadOnlyList<AlignmentGuide>? AlignmentGuides = null, bool MarqueeContains = false, RectD? FocusBounds = null);
+    RectD? Marquee = null, (PointD Start, PointD End)? EdgePreview = null, bool Overview = false, PointD? CandidatePosition = null, bool IsValidConnection = true, IReadOnlyList<AlignmentGuide>? AlignmentGuides = null, bool MarqueeContains = false, RectD? FocusBounds = null)
+{
+    /// <summary>Optional rectangular/custom grid. Null retains the legacy uniform GridSize option.</summary>
+    public GraphGridSettings? GridSettings { get; init; }
+}
 public sealed record RenderStatistics(int VisibleNodes, int VisibleEdges, int CachedNodePictures, double CpuDrawMilliseconds, int VisibleLabels = 0, int VisiblePorts = 0, int ExaminedItems = 0, int SelectionAdorners = 0);
 public sealed record RenderPreparationStatistics(int SceneBuilds, int NodeIndexBuilds, int EdgeIndexBuilds, int AnnotationIndexBuilds, int CreatedPaths, int ReusedPaths);
 
@@ -117,8 +121,10 @@ public sealed partial class GraphRenderer : IDisposable
         var save = canvas.Save();
         try
         {
-            canvas.ClipRect(SKRect.Create((float)width, (float)height)); canvas.Clear(SKColors.White); canvas.Scale((float)zoom); canvas.Translate((float)-origin.X, (float)-origin.Y);
-            if (options.ShowGrid && !options.Overview) DrawGrid(canvas, view, zoom, options.GridSize);
+            canvas.ClipRect(SKRect.Create((float)width, (float)height)); canvas.Clear(SKColors.White);
+            if (options.ShowGrid && !options.Overview) gridRenderer.Render(canvas, ResolveGrid(options), viewport.State, width, height);
+            else gridRenderer.Hide();
+            canvas.Scale((float)zoom); canvas.Translate((float)-origin.X, (float)-origin.Y);
             foreach (var node in visibleGroups) DrawNode(canvas, node, zoom, options.Overview);
             foreach (var id in visibleEdgeIds) DrawEdge(canvas, edges[id], zoom, options);
             foreach (var node in visibleNodes) DrawNode(canvas, node, zoom, options.Overview);
@@ -149,7 +155,7 @@ public sealed partial class GraphRenderer : IDisposable
     {
         if (disposed) return; disposed = true;
         DisposePictures(); foreach (var edge in edges.Values) edge.Path.Dispose(); edges.Clear();
-        edgePainter.Dispose(); paint.Dispose(); shaper.Dispose(); if (ownsTypeface) typeface.Dispose();
+        gridRenderer.Dispose(); edgePainter.Dispose(); paint.Dispose(); shaper.Dispose(); if (ownsTypeface) typeface.Dispose();
         graph = null; index = null; measuredLabels.Clear(); measuredCaptions.Clear(); ClearAnnotationCache(); visibleNodeIds.Clear(); visibleEdgeIds.Clear(); visibleNodes.Clear(); visibleGroups.Clear();
         nodeIndex = new([]); edgeIndex = new([]); ClearEdgeCaptions(); order.Clear(); depths.Clear();
     }

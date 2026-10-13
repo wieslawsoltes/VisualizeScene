@@ -4,17 +4,6 @@ namespace VisualizeScene.Rendering.Skia;
 
 public sealed partial class GraphRenderer
 {
-    private void DrawGrid(SKCanvas canvas, RectD view, double zoom, double step)
-    {
-        if (!double.IsFinite(step) || step <= 0) return;
-        while (step * zoom < 14) step *= 2;
-        while (step * zoom > 45) step /= 2;
-        Use(new SKColor(211, 220, 229));
-        var startX = Math.Floor(view.X / step) * step; var startY = Math.Floor(view.Y / step) * step;
-        // Integer iteration guarantees termination when large coordinates cannot represent +step.
-        var columns = Math.Clamp((int)Math.Ceiling(view.Width / step) + 2, 0, 4096); var rows = Math.Clamp((int)Math.Ceiling(view.Height / step) + 2, 0, 4096);
-        for (var x = 0; x < columns; x++) for (var y = 0; y < rows; y++) canvas.DrawCircle((float)(startX + x * step), (float)(startY + y * step), (float)(.65 / zoom), paint);
-    }
     private static SKPath Shape(GraphNode node)
     {
         var b = node.Bounds; var path = new SKPath();

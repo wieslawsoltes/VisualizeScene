@@ -35,7 +35,7 @@ public sealed partial class EditorSession
     }
     private PointD SnapNodeTranslation(GraphNode node, PointD delta)
     {
-        var position = new PointD(node.Bounds.X, node.Bounds.Y);
+        var position = gridSettings.NodeAnchor == GridNodeAnchor.Center ? node.Bounds.Center : new PointD(node.Bounds.X, node.Bounds.Y);
         var gridDelta = SnapToGrid ? Snap(position + delta) - position : delta;
         if (!SnapToItems) return gridDelta;
         var result = itemSnaps.Snap(movingBounds.Move(delta), gridDelta - delta, snapExclusions, Viewport.Zoom, ItemSnapDistance);
