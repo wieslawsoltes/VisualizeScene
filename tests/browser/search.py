@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import traceback
 from playwright.sync_api import sync_playwright
+from native_menu import target as input_target
 
 url = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8080/VisualizeScene/?test=1"
 out = Path("artifacts/browser-search")
@@ -26,7 +27,7 @@ fixture = out / "fixture.json"
 fixture.write_text(json.dumps(model), encoding="utf-8")
 empty = out / "empty.json"
 empty.write_text(json.dumps({"Version": 1, "Graph": {k: [] for k in ["Nodes", "Edges", "Ports", "Labels"]}}))
-results, errors = [], []
+results, errors, input_targets = [], [], []
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, args=["--enable-unsafe-swiftshader", "--use-angle=swiftshader", "--disable-dev-shm-usage"])
     page = browser.new_page(viewport={"width": 1440, "height": 1050})
@@ -38,11 +39,12 @@ with sync_playwright() as p:
     def click(name):
         key = json.dumps(name)
         wait(f"v.controls[{key}]?.width > 0 && v.controls[{key}]?.height > 0")
-        b = state()["controls"][name]
+        b = input_target(page, name, input_targets)
         page.mouse.click(b["x"]+b["width"]/2, b["y"]+b["height"]/2)
         page.wait_for_timeout(150)
     def fill(name, text):
         click(name)
+        if name == "SearchQuery": wait("v.search.input.queryFocused")
         page.keyboard.press("Control+a")
         if text:
             page.keyboard.insert_text(text)
@@ -51,10 +53,14 @@ with sync_playwright() as p:
     def find(text, count):
         fill("SearchQuery", text)
         wait("v.search.ready && v.search.query === "+json.dumps(text)+f" && v.search.count === {count}")
+    def toggle(name, enabled):
+        click("Search"+name)
+        wait("v.search.input.options["+json.dumps(name)+"]==="+str(enabled).lower())
     def choose_kind(index):
-        click("SearchKind"); page.keyboard.press("Home")
+        click("SearchKind"); wait("v.search.input.kindOpen"); page.keyboard.press("Home")
         for _ in range(index): page.keyboard.press("ArrowDown")
         page.keyboard.press("Enter")
+        wait(f"v.search.input.kind==={index} && !v.search.input.kindOpen")
         page.wait_for_timeout(300)
     def open_replace():
         click("MenuEdit"); click("ReplaceGraph"); wait("v.search.open")
@@ -82,17 +88,20 @@ with sync_playwright() as p:
         assert state()["revision"]==revision
         page.screenshot(path=str(out/"search-panel.png"))
         record("Find spans captions, edges and independent labels without modifying the document")
+        reveal_count=state()["search"]["input"]["revealRequests"]
         click("SearchNext"); wait("v.search.current === 1")
+        assert state()["search"]["input"]["revealRequests"]==reveal_count+1
         page.keyboard.press("F3"); wait("v.search.current === 2")
         page.keyboard.press("Shift+F3"); wait("v.search.current === 1")
         click("SearchPrevious"); wait("v.search.current === 0")
         click("SearchPrevious"); wait("v.search.current === 5")
         assert state()["model"]==before
         record("Next, previous and F3 navigation wrap through occurrences")
-        click("SearchCase"); find("Alpha",4)
-        click("SearchWord"); find("alpha",1)
-        click("SearchCase"); wait("v.search.ready && v.search.count === 5")
-        click("SearchWord"); wait("v.search.ready && v.search.count === 6")
+        record("Next issues one viewport reveal instead of duplicating its selection-change callback")
+        toggle("Case",True); find("Alpha",4)
+        toggle("Word",True); find("alpha",1)
+        toggle("Case",False); wait("v.search.ready && v.search.count === 5")
+        toggle("Word",False); wait("v.search.ready && v.search.count === 6")
         record("Case and whole-word options change actual result counts")
         fill("SearchReplacement","Z")
         click("SearchReplace")
@@ -108,17 +117,26 @@ with sync_playwright() as p:
         click("Undo"); wait(f"v.revision === {revision+2} && v.search.ready && v.search.count === 6")
         assert state()["model"]==before
         record("Replace All is one undo entry and skips locked owners")
-        find("secret",0); click("SearchHidden"); wait("v.search.ready && v.search.count === 1 && v.selection[0] === 'g'")
+        stable_names=["SearchQuery","SearchIds","SearchHidden","SearchKind","SearchReplace","SearchReplaceAll"]
+        stable_boxes={name:state()["controls"][name] for name in stable_names}
+        find("secret",0); toggle("Hidden",True); wait("v.search.ready && v.search.count === 1 && v.selection[0] === 'g'")
         assert state()["model"]==before and next(n for n in before["Graph"]["Nodes"] if n["Id"]=="g")["Collapsed"]
         record("Hidden results reveal the folded representative without expanding or editing the group")
-        click("SearchHidden"); click("SearchIds"); choose_kind(5); find("ap",1)
+        page.wait_for_timeout(250)
+        assert all(state()["controls"][name]==box for name,box in stable_boxes.items()), "Search feedback moved an input target"
+        record("Search options and replacement actions remain stationary for long hidden-match feedback")
+        count=state()["search"]["input"]["revealRequests"]
+        click("SearchNext"); wait("v.search.current===0")
+        assert state()["search"]["input"]["revealRequests"]==count+1 and state()["model"]==before
+        record("Cycling a single match still performs exactly one reveal")
+        toggle("Hidden",False); toggle("Ids",True); choose_kind(5); find("ap",1)
         wait("v.selection[0] === 'ap'")
         record("Port IDs are searchable as read-only results")
-        choose_kind(0); click("SearchIds"); find("",0); click("SearchClose")
-        page.mouse.click(*node_point("a")); open_replace(); click("SearchSelection"); find("alpha",3)
+        choose_kind(0); toggle("Ids",False); find("",0); click("SearchClose")
+        page.mouse.click(*node_point("a")); open_replace(); toggle("Selection",True); find("alpha",3)
         click("SearchNext"); wait("v.search.current === 1 && v.search.count === 3")
         record("Captured-selection scope is stable while navigating results")
-        click("SearchSelection"); choose_kind(3)
+        toggle("Selection",False); choose_kind(3)
         for _ in range(8): click("ZoomOut")
         wait("v.zoom < .25")
         find("Alpha",1)
@@ -145,6 +163,15 @@ with sync_playwright() as p:
         find("Beta",1); page.screenshot(path=str(out/"narrow-search.png"))
         b=state()["controls"]["SearchQuery"]; assert b["x"]>=0 and b["x"]+b["width"]<=640
         record("Search remains usable with the workbench side rails collapsed")
+        page.set_viewport_size({"width":640,"height":520})
+        wait("v.search.bounds.height<=v.canvas.height-15")
+        page.wait_for_timeout(250)
+        view=state(); box=view["search"]["bounds"]; canvas=view["canvas"]
+        assert box["y"]>=canvas["y"] and box["y"]+box["height"]<=canvas["y"]+canvas["height"]
+        click("SearchClose"); wait("!v.search.open && v.graphFocused")
+        page.set_viewport_size({"width":640,"height":900}); page.wait_for_timeout(250)
+        open_replace(); find("Beta",1)
+        record("Short windows constrain the modeless panel and keep Close reachable without altering graph data")
         click("SearchClose"); click("Fit")
         with page.expect_file_chooser() as pending: click("Open")
         # Chromium intercepts its native picker; keep the real Uno picker task pending,
@@ -160,12 +187,12 @@ with sync_playwright() as p:
         record("A pending real upload task cannot overwrite subsequent graph edits", "graph changed while the file picker was open")
         assert not errors,errors
     except Exception as error:
-        traceback.print_exc(); errors.append(str(error))
+        traceback.print_exc(); errors.append(traceback.format_exc())
         try: page.screenshot(path=str(out/"failure.png"))
         except Exception: pass
     finally:
         try: (out/"state.json").write_text(json.dumps(state(),indent=2),encoding="utf-8")
         except Exception: pass
-        (out/"report.json").write_text(json.dumps({"results":results,"errors":errors,"note":"Actual compiled Uno input scenarios; Chromium SwiftShader is software rendering."},indent=2),encoding="utf-8")
+        (out/"report.json").write_text(json.dumps({"results":results,"errors":errors,"inputTargets":input_targets,"note":"Actual compiled Uno input scenarios; Chromium SwiftShader is software rendering."},indent=2),encoding="utf-8")
         browser.close()
 sys.exit(1 if errors else 0)
