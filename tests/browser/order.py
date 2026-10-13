@@ -6,6 +6,7 @@ import sys
 import traceback
 from PIL import Image
 from playwright.sync_api import sync_playwright
+from native_menu import target as menu_target
 
 url = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8080/VisualizeScene/?test=1'
 out = Path('artifacts/browser-workspace/order'); out.mkdir(parents=True, exist_ok=True)
@@ -44,9 +45,10 @@ with sync_playwright() as p:
     def ws(): return page.evaluate('globalThis.visualizeSceneWorkspace')
     def wait(expression):
         page.wait_for_function('() => {const v=globalThis.visualizeSceneState,w=globalThis.visualizeSceneWorkspace;return v&&w&&('+expression+');}', timeout=45000)
+    menu_targets = []
     def control(name):
         wait('v.controls['+json.dumps(name)+']?.width>0')
-        b = state()['controls'][name]; return b['x'] + b['width']/2, b['y'] + b['height']/2
+        b = menu_target(page, name, menu_targets); return b['x'] + b['width']/2, b['y'] + b['height']/2
     def click(name): page.mouse.click(*control(name)); page.wait_for_timeout(150)
     def screen(x, y):
         v = state(); return v['canvas']['x'] + (x-v['origin']['x'])*v['zoom'], v['canvas']['y'] + (y-v['origin']['y'])*v['zoom']
@@ -146,6 +148,6 @@ with sync_playwright() as p:
         for name, fn in [('state',state),('workspace',ws),('input-events',lambda: page.evaluate('globalThis.orderInputEvents'))]:
             try: (out/(name+'.json')).write_text(json.dumps(fn(),indent=2))
             except Exception: pass
-        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno, actual input and screenshot pixels. SwiftShader is software rendering.'},indent=2))
+        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'menuTargets':menu_targets,'note':'Compiled Uno, actual input and screenshot pixels. SwiftShader is software rendering.'},indent=2))
         browser.close()
 sys.exit(1 if errors else 0)

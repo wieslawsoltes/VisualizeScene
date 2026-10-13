@@ -5,6 +5,7 @@ import sys
 import traceback
 import xml.etree.ElementTree as ET
 from playwright.sync_api import sync_playwright
+from native_menu import target as menu_target
 
 url = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8080/VisualizeScene/?test=1'
 out = Path('artifacts/browser-workspace/edge-styles'); out.mkdir(parents=True, exist_ok=True)
@@ -13,7 +14,7 @@ for ident, x, y in [('a', 0, 0), ('b', 450, 0), ('c', 0, 300), ('d', 450, 300)]:
     g['Nodes'].append({'Id': ident, 'Bounds': {'X': x, 'Y': y, 'Width': 100, 'Height': 60},
                       'Text': ident.upper(), 'Shape': 'RoundedRectangle', 'Fill': '#FFCC66', 'Stroke': '#A87523'})
 fixture = out / 'fixture.json'; fixture.write_text(json.dumps({'Version': 1, 'Graph': g}))
-results, errors, choices = [], [], []
+results, errors, choices, menu_targets = [], [], [], []
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, args=['--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--disable-dev-shm-usage'])
     page = browser.new_page(viewport={'width': 1440, 'height': 1050}, accept_downloads=True)
@@ -24,7 +25,7 @@ with sync_playwright() as p:
         page.wait_for_function('() => {const v=globalThis.visualizeSceneState,w=globalThis.visualizeSceneWorkspace;return v&&w&&('+expression+');}', timeout=45000)
     def click(name):
         key = json.dumps(name); wait(f'v.controls[{key}]?.width>0 && v.controls[{key}]?.height>0')
-        b = state()['controls'][name]; x, y = b['x']+b['width']/2, b['y']+b['height']/2
+        b = menu_target(page, name, menu_targets); x, y = b['x']+b['width']/2, b['y']+b['height']/2
         assert 0 <= x < 1440 and 0 <= y < 1050, (name, b)
         page.mouse.click(x, y); page.wait_for_timeout(200)
     def point(ident):
@@ -139,6 +140,6 @@ with sync_playwright() as p:
             (out/'state.json').write_text(json.dumps(state(),indent=2))
             (out/'workspace.json').write_text(json.dumps(page.evaluate('globalThis.visualizeSceneWorkspace'),indent=2))
         except Exception: pass
-        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'choices':choices,'note':'Compiled Uno, native pointer/keyboard/file input; SwiftShader software rendering.'},indent=2))
+        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'choices':choices,'menuTargets':menu_targets,'note':'Compiled Uno, native pointer/keyboard/file input; SwiftShader software rendering.'},indent=2))
         browser.close()
 sys.exit(1 if errors else 0)

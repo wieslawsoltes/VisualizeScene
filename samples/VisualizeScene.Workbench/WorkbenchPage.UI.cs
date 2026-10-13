@@ -11,7 +11,7 @@ namespace VisualizeScene.Workbench;
 public sealed partial class WorkbenchPage
 {
     private static SolidColorBrush Brush(string hex) => new(Windows.UI.Color.FromArgb(255, Convert.ToByte(hex.Substring(1, 2), 16), Convert.ToByte(hex.Substring(3, 2), 16), Convert.ToByte(hex.Substring(5, 2), 16)));
-    private void Register(string id, FrameworkElement element) { AutomationProperties.SetAutomationId(element, id); testControls[id] = element; }
+    private void Register(string id, FrameworkElement element) { AutomationProperties.SetAutomationId(element, id); testControls[id] = element; RegisterMenuDiagnostics(id, element); }
     private Button Button(string label, string id, Action action, string? tooltip = null)
     {
         var button = new Button { Content = label, FontSize = 12, Padding = new(7, 3, 7, 3), MinHeight = 27 };
