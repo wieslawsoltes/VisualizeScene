@@ -14,7 +14,7 @@ namespace VisualizeScene.Controls.Uno;
 public enum GraphArrangeCommand
 {
     AlignLeft, AlignHorizontalCenter, AlignRight, AlignTop, AlignVerticalCenter, AlignBottom,
-    DistributeHorizontal, DistributeVertical, SameWidth, SameHeight, SameSize
+    DistributeHorizontal, DistributeVertical, SameWidth, SameHeight, SameSize, FitGroups, EnlargeGroups
 }
 
 /// <summary>Compact reusable arrangement commands. Availability is cached by nodes, selection and keyboard focus, never per frame.</summary>
@@ -50,6 +50,18 @@ public sealed class GraphArrangeToolbar : StackPanel, IDisposable
                     if (command == GraphArrangeCommand.DistributeVertical) canvas.RotateDegrees(90, 9, 9);
                     Box(1, 7, 3, 8, true); Box(7, 4, 4, 11, false); Box(14, 8, 3, 7, true);
                     Line(2, 2, 16, 2); Line(2, 0, 2, 4); Line(9, 0, 9, 3); Line(16, 0, 16, 4);
+                }
+                else if (command is GraphArrangeCommand.FitGroups or GraphArrangeCommand.EnlargeGroups)
+                {
+                    Line(1, 5, 1, 1); Line(1, 1, 6, 1); Line(12, 1, 17, 1); Line(17, 1, 17, 5);
+                    Line(1, 12, 1, 17); Line(1, 17, 6, 17); Line(12, 17, 17, 17); Line(17, 17, 17, 12);
+                    Box(4, 5, 4, 5, true); Box(10, 9, 4, 5, false);
+                    if (command == GraphArrangeCommand.EnlargeGroups)
+                    {
+                        Line(6, 6, 1, 1); Line(12, 12, 17, 17);
+                        Line(1, 1, 1, 4); Line(1, 1, 4, 1);
+                        Line(17, 17, 14, 17); Line(17, 17, 17, 14);
+                    }
                 }
                 else
                 {
@@ -96,6 +108,8 @@ public sealed class GraphArrangeToolbar : StackPanel, IDisposable
         GraphArrangeCommand.AlignVerticalCenter => "Align vertical centers", GraphArrangeCommand.AlignBottom => "Align bottom",
         GraphArrangeCommand.DistributeHorizontal => "Distribute horizontally", GraphArrangeCommand.DistributeVertical => "Distribute vertically",
         GraphArrangeCommand.SameWidth => "Make same width", GraphArrangeCommand.SameHeight => "Make same height", GraphArrangeCommand.SameSize => "Make same size",
+        GraphArrangeCommand.FitGroups => "Fit groups to children",
+        GraphArrangeCommand.EnlargeGroups => "Enlarge groups to children",
         _ => throw new ArgumentOutOfRangeException(nameof(command))
     };
     public static bool CanExecute(GraphArrangeCommand command, GraphArrangeState state) => command switch
@@ -104,6 +118,7 @@ public sealed class GraphArrangeToolbar : StackPanel, IDisposable
         GraphArrangeCommand.AlignTop or GraphArrangeCommand.AlignVerticalCenter or GraphArrangeCommand.AlignBottom => state.MovableRoots >= 2,
         GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.DistributeVertical => state.MovableRoots >= 3,
         GraphArrangeCommand.SameWidth or GraphArrangeCommand.SameHeight or GraphArrangeCommand.SameSize => state.ResizableTargets >= 1,
+        GraphArrangeCommand.FitGroups or GraphArrangeCommand.EnlargeGroups => state.FittableGroups > 0,
         _ => false
     };
     public GraphArrangeToolbar()
@@ -111,7 +126,7 @@ public sealed class GraphArrangeToolbar : StackPanel, IDisposable
         Orientation = Orientation.Horizontal; Spacing = 1;
         foreach (var command in Enum.GetValues<GraphArrangeCommand>())
         {
-            if (command is GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.SameWidth)
+            if (command is GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.SameWidth or GraphArrangeCommand.FitGroups)
                 Children.Add(new Border { Width = 1, Height = 18, Margin = new(3, 0, 3, 0), Background = NodePalette.Brush("#CCD4DD"), VerticalAlignment = VerticalAlignment.Center });
             var button = new Button { Content = new ArrangeIcon(command) { Width = 18, Height = 18, IsHitTestVisible = false },
                 Width = 25, Height = 25, MinWidth = 0, MinHeight = 0, Padding = new(3), CornerRadius = new(1),

@@ -42,6 +42,17 @@ void Measure(string name, Action action, int samples = 40, int batch = 1)
     Console.WriteLine($"{name}: p50 {p50:F6} ms; p95 {p95:F6} ms; {allocations[samples / 2]} bytes/op");
 }
 Func<GraphLabel, PointD> fixedMetrics = _ => new(80, 20);
+// One fitted group amid unrelated annotations. Both revisions keep exact no-op geometry.
+var scopeGraph = graph with
+{
+    Nodes = graph.Nodes.Add(new("scopeGroup", new(-28, -48, 156, 136), IsGroup: true))
+        .Add(new("scopeChild", new(0, 0, 100, 60), ParentId: "scopeGroup")),
+    Labels = graph.Labels.Add(new("scopeLabel", "scopeChild", "Inside", new()))
+};
+string[] scopeIds = ["scopeGroup"];
+if (!ReferenceEquals(GraphGroupSizing.Calculate(scopeGraph, scopeIds, measure: fixedMetrics).Graph, scopeGraph))
+    throw new InvalidOperationException("The group annotation scope benchmark must be a no-op.");
+Measure("group_fit_scope_10000", () => sink = GraphGroupSizing.Calculate(scopeGraph, scopeIds, measure: fixedMetrics));
 Measure("scene_bounds_10000", () => sink = GraphScene.Bounds(graph, fixedMetrics));
 var spatialItems = nodes.Select(n => (n.Bounds, n.Id)).ToArray();
 Measure("spatial_build_10000", () => sink = new SpatialIndex<string>(spatialItems));

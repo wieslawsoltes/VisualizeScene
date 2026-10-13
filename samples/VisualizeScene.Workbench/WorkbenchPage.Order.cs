@@ -15,7 +15,7 @@ public sealed partial class WorkbenchPage
         {
             var item = new MenuFlyoutItem { Text = GraphOrderToolbar.Caption(operation) };
             Register("MenuOrder" + operation, item);
-            item.Click += (_, _) => Run(() => graph.ChangeDrawingOrder(operation)); arrange.Items.Add(item);
+            item.Click += (_, _) => Run(() => { graph.ChangeDrawingOrder(operation); ReturnSelectionFocus(arrange, item); }); arrange.Items.Add(item);
         }
     }
     private Border BuildRightRail()

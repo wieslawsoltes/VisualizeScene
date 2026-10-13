@@ -16,6 +16,8 @@ public sealed partial class GraphControl
             throw new InvalidOperationException("The graph or selection changed while preparing arrangement.");
         switch (command)
         {
+            case GraphArrangeCommand.FitGroups: session.FitGroups(); break;
+            case GraphArrangeCommand.EnlargeGroups: session.FitGroups(new(EnlargeOnly: true)); break;
             case GraphArrangeCommand.SameWidth: session.MatchNodeSize(NodeSizeMatch.Width); break;
             case GraphArrangeCommand.SameHeight: session.MatchNodeSize(NodeSizeMatch.Height); break;
             case GraphArrangeCommand.SameSize: session.MatchNodeSize(NodeSizeMatch.Both); break;

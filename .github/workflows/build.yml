@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Validate native menu observation contract
+        run: node tests/browser/native_menu.test.mjs
       - name: Run core conformance
         run: dotnet run --project tests/VisualizeScene.Tests -c Release
       - name: Run editor interaction regressions

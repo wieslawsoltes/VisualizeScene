@@ -25,7 +25,12 @@ public sealed partial class WorkbenchPage
     private void Import(string text, long? expectedRevision = null)
     {
         var import = text.TrimStart().StartsWith('<') ? GraphIO.FromGraphML(text) : new GraphImportResult(GraphIO.FromJson(text), []);
-        document.Replace(import.Graph, "Import graph", expectedRevision: expectedRevision); graph.Fit(); status.Text = import.Diagnostics.Count == 0 ? "Graph imported." : string.Join(" ", import.Diagnostics);
+        document.Replace(import.Graph, "Import graph", expectedRevision: expectedRevision);
+        // A file is a new editing context even when its IDs/data match the current graph.
+        // Replace intentionally suppresses equivalent model revisions; reset input explicitly.
+        graph.SetMode(VisualizeScene.Editing.EditorMode.Select);
+        graph.Session.ClearSelection(); graph.Session.FocusItem(null);
+        graph.Fit(); status.Text = import.Diagnostics.Count == 0 ? "Graph imported." : string.Join(" ", import.Diagnostics);
     }
     private async Task Save(string extension)
     {

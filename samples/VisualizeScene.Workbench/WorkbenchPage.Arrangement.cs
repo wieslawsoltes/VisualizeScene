@@ -26,7 +26,7 @@ public sealed partial class WorkbenchPage
     {
         foreach (var command in Enum.GetValues<GraphArrangeCommand>())
         {
-            if (command is GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.SameWidth) menu.Items.Add(new MenuFlyoutSeparator());
+            if (command is GraphArrangeCommand.DistributeHorizontal or GraphArrangeCommand.SameWidth or GraphArrangeCommand.FitGroups) menu.Items.Add(new MenuFlyoutSeparator());
             var item = new MenuFlyoutItem { Text = GraphArrangeToolbar.Caption(command), IsEnabled = false };
             Register("MenuArrange" + command, item);
             item.Click += (_, _) => Run(() => { graph.ArrangeNodes(command); ReturnSelectionFocus(menu, item); });
@@ -42,7 +42,9 @@ public sealed partial class WorkbenchPage
         Uno.Foundation.WebAssemblyRuntime.InvokeJS($"globalThis.visualizeSceneLayout={{kind:{layoutKind.SelectedIndex},open:{(layoutKind.IsDropDownOpen ? "true" : "false")},direction:{direction.SelectedIndex},directionOpen:{(direction.IsDropDownOpen ? "true" : "false")}}};");
         var state = arrangeToolbar.State;
         var reference = state.ReferenceId is { } id ? "\"" + System.Text.Json.JsonEncodedText.Encode(id).ToString() + "\"" : "null";
-        Uno.Foundation.WebAssemblyRuntime.InvokeJS($"globalThis.visualizeSceneArrange={{builds:{arrangeToolbar.StateBuilds},roots:{state.MovableRoots},reference:{reference}}};");
+        var selected = string.Join(",", graph.Session.Selection.Select(selectedId => "\"" + System.Text.Json.JsonEncodedText.Encode(selectedId).ToString() + "\""));
+        var focus = graph.Session.FocusedItemId is { } focused ? "\"" + System.Text.Json.JsonEncodedText.Encode(focused).ToString() + "\"" : "null";
+        Uno.Foundation.WebAssemblyRuntime.InvokeJS($"globalThis.visualizeSceneArrange={{revision:{document.Revision},selection:[{selected}],focus:{focus},builds:{arrangeToolbar.StateBuilds},roots:{state.MovableRoots},reference:{reference}}};");
 #endif
     }
     private void UpdateArrangeMenu()

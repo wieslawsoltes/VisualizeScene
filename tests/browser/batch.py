@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import traceback
 from playwright.sync_api import sync_playwright
+from native_context import target as context_target
 
 url = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8080/VisualizeScene/?test=1'
 out = Path('artifacts/browser-workspace/batch'); out.mkdir(parents=True, exist_ok=True)
@@ -20,7 +21,7 @@ g['Edges'] = [{'Id':'ab','SourceId':'a','TargetId':'b','Text':'Flow','Weight':7,
 g['Ports'] = [{'Id':'ap','NodeId':'a','RelativeLocation':{'X':1,'Y':.5}}]
 g['Labels'] = [{'Id':i,'OwnerId':owner,'Text':text,'Offset':{'X':0,'Y':90},'FontSize':12} for i,owner,text in [('la','a','A note'),('lb','b','B note')]]
 fixture = out/'fixture.json'; fixture.write_text(json.dumps({'Version':1,'Graph':g}))
-results, errors = [], []
+results, errors, context_targets = [], [], []
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, args=['--enable-unsafe-swiftshader','--use-angle=swiftshader','--disable-dev-shm-usage'])
     page = browser.new_page(viewport={'width':1440,'height':1050})
@@ -32,7 +33,8 @@ with sync_playwright() as p:
         page.wait_for_function('() => {const v=globalThis.visualizeSceneState,w=globalThis.visualizeSceneWorkspace;return v&&w&&('+expression+');}', timeout=45000)
     def click(name):
         wait('v.controls['+json.dumps(name)+']?.width>0 && v.controls['+json.dumps(name)+']?.height>0')
-        b=state()['controls'][name]; x,y=b['x']+b['width']/2,b['y']+b['height']/2
+        b=context_target(page,name,context_targets) if name.startswith('Context') else state()['controls'][name]
+        x,y=b['x']+b['width']/2,b['y']+b['height']/2
         assert 0<=x<1440 and 0<=y<1050,(name,b)
         page.mouse.click(x,y); page.wait_for_timeout(180)
     def point(ident):
@@ -121,7 +123,9 @@ with sync_playwright() as p:
         record('Keyboard context menu retains the selection and Escape closes it without an edit')
         c=state()['canvas']; page.mouse.click(c['x']+c['width']*.95,c['y']+c['height']*.95,button='right')
         wait('w.contextOpen && v.selection.length===0 && !w.enabled.ContextDelete && !w.enabled.ContextGroup')
-        click('ContextCreateNode'); wait('v.model.Graph.Nodes.length===6'); undo(baseline)
+        before_create=state()['revision']
+        click('ContextCreateNode'); wait(f'v.model.Graph.Nodes.length===6 && v.revision==={before_create+1} && !w.contextOpen')
+        undo(baseline)
         record('Blank-canvas context has disabled selection actions and undoable create-here')
         # Selecting an edge must not leave the last selected node highlighted in the outline.
         click('TabStructure'); click('ModeSelect'); page.keyboard.press('Control+a')
@@ -138,6 +142,6 @@ with sync_playwright() as p:
         for name,fn in [('state',state),('workspace',workspace)]:
             try:(out/(name+'.json')).write_text(json.dumps(fn(),indent=2))
             except Exception:pass
-        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'note':'Compiled Uno, real input and read-only diagnostics. SwiftShader software rendering.'},indent=2))
+        (out/'report.json').write_text(json.dumps({'results':results,'errors':errors,'contextTargets':context_targets,'note':'Compiled Uno, real input and read-only diagnostics. SwiftShader software rendering.'},indent=2))
         browser.close()
 sys.exit(1 if errors else 0)
