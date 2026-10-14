@@ -42,7 +42,15 @@ public sealed partial class WorkbenchPage
         using var editor = new GraphGridEditor(); editor.LoadSettings(original); gridEditor = editor;
         // Give the reusable editor a finite viewport; do not put its pinned footer
         // inside another scrolling region. Resize while open as well as at creation.
-        void SizeEditor() => editor.Height = Math.Max(120,Math.Min(550,root.Size.Height - 200));
+        void SizeEditor()
+        {
+            // A MaxWidth alone still allows native measure to grow the dialog when
+            // validation text appears. Constrain both axes independently of content.
+            // Leave room for the default ContentDialog padding, border and margins.
+            editor.MinWidth = 0;
+            editor.Width = Math.Max(0, Math.Min(420, root.Size.Width - 80));
+            editor.Height = Math.Max(120, Math.Min(550, root.Size.Height - 200));
+        }
         void RootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => SizeEditor();
         SizeEditor();
         var dialog = new GridSettingsDialog { XamlRoot = root, Title = "Grid settings", Content = editor, PrimaryButtonText = "Apply", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Primary };
