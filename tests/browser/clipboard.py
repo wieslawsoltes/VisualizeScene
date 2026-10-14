@@ -33,7 +33,15 @@ with sync_playwright() as p:
         page.mouse.click(x,y);page.wait_for_timeout(180)
     def menu(name):
         click('MenuEdit');click(name);wait('!v.controls['+json.dumps(name)+'] && v.graphFocused')
+    imports=[0]
     def load():
+        # Exercise the normal save-before-replace flow instead of leaving the
+        # unsaved-document confirmation dialog unanswered between scenarios.
+        before=state()['model']
+        with page.expect_download() as pending:click('Save')
+        imports[0]+=1;saved=out/('before-import-'+str(imports[0])+'.json')
+        pending.value.save_as(str(saved));assert json.loads(saved.read_text())==before
+        wait("!w.documentTitle.endsWith(' *')")
         with page.expect_file_chooser() as chooser:click('Open')
         chooser.value.set_files(str(fixture));wait("v.status==='Graph imported.' && v.model.Graph.Nodes.length===2 && v.selection.length===0")
         click('ModeSelect')
