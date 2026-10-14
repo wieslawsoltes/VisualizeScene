@@ -107,6 +107,15 @@ jobs:
       - name: Browser ports, reconnection and modal labels
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/editing.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Browser unified clipboard commands
+        if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
+        run: python tests/browser/clipboard.py http://127.0.0.1:8080/VisualizeScene/?test=1
+      - name: Preserve clipboard diagnostics immediately
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-clipboard
+          path: artifacts/browser-clipboard
       - name: Browser automatic label placement and alignment guides
         if: ${{ !cancelled() && steps.browser_deps.outcome == 'success' }}
         run: python tests/browser/placement.py http://127.0.0.1:8080/VisualizeScene/?test=1

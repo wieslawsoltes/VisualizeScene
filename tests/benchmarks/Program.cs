@@ -41,6 +41,16 @@ void Measure(string name, Action action, int samples = 40, int batch = 1)
     results.Add(new { name, samples, batch, medianMilliseconds = p50, p95Milliseconds = p95, medianAllocatedBytes = allocations[samples / 2] });
     Console.WriteLine($"{name}: p50 {p50:F6} ms; p95 {p95:F6} ms; {allocations[samples / 2]} bytes/op");
 }
+// Fully selected nested groups used to repeat descendant traversal for every ancestor.
+var clipboardNodes = Enumerable.Range(0, 1000).Select(i => new GraphNode("cg" + i,
+    new(0, 0, 100, 60), ParentId: i == 0 ? null : "cg" + (i - 1), IsGroup: true)).ToImmutableArray();
+var clipboardGraph = new GraphSnapshot(clipboardNodes, [], [], []);
+var clipboardSelection = clipboardNodes.Select(n => n.Id).ToArray();
+if (!GraphClipboard.Copy(clipboardGraph, clipboardSelection).Nodes.SequenceEqual(clipboardNodes))
+    throw new InvalidOperationException("Clipboard benchmark changed nested order or parents.");
+Measure("clipboard_nested_1000", () => sink = GraphClipboard.Copy(clipboardGraph, clipboardSelection), samples: 20);
+var allCopyNodes = graph.Nodes.Select(n => n.Id).ToArray();
+Measure("clipboard_all_10000", () => sink = GraphClipboard.Copy(graph, allCopyNodes), samples: 20);
 Func<GraphLabel, PointD> fixedMetrics = _ => new(80, 20);
 // One fitted group amid unrelated annotations. Both revisions keep exact no-op geometry.
 var scopeGraph = graph with

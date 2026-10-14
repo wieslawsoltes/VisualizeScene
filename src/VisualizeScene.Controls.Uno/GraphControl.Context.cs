@@ -31,7 +31,7 @@ public sealed partial class GraphControl
         Focus(FocusState.Programmatic);
         if (Document != owner || Session != session || owner.Revision != revision)
             throw new InvalidOperationException("The graph changed while opening its context menu.");
-        var selected = session.Selection; var index = owner.Snapshot.Index();
+        var selected = session.Selection; var clipboardRevision = session.ClipboardRevision; var index = owner.Snapshot.Index();
         var nodes = selected.Where(index.Nodes.ContainsKey).Select(id => index.Nodes[id]).ToArray();
         var groups = nodes.Where(n => n.IsGroup).ToArray();
         var single = selected.Count == 1 ? selected.First() : null;
@@ -40,7 +40,7 @@ public sealed partial class GraphControl
         position = new(Math.Clamp(position.X, 0, Math.Max(0, ActualWidth)), Math.Clamp(position.Y, 0, Math.Max(0, ActualHeight)));
         var world = session.Viewport.ToWorld(position);
         var menu = new MenuFlyout(); graphContextMenu = menu; ContextMenuGeneration++;
-        bool Current() => !disposed && Document == owner && Session == session && owner.Revision == revision && ReferenceEquals(selected, session.Selection);
+        bool Current() => !disposed && Document == owner && Session == session && owner.Revision == revision && ReferenceEquals(selected, session.Selection) && clipboardRevision == session.ClipboardRevision;
         void Item(string id, string text, Action action, bool enabled = true)
         {
             var item = new MenuFlyoutItem { Text = text, IsEnabled = enabled };
@@ -55,10 +55,11 @@ public sealed partial class GraphControl
         Item("AddLabel", "Add independent label", AddLabelToSelection, single is not null);
         Item("AddPort", "Add port", () => session.AddPort(nodes[0].Id, new(nodes[0].Bounds.Right, nodes[0].Bounds.Center.Y)), selected.Count == 1 && nodes.Length == 1 && !nodes[0].Locked);
         menu.Items.Add(new MenuFlyoutSeparator());
-        Item("Copy", "Copy  Ctrl+C", () => session.Copy(), selected.Count > 0);
-        Item("Cut", "Cut  Ctrl+X", () => { session.Copy(); session.DeleteSelection(); }, selected.Count > 0);
-        Item("Paste", "Paste  Ctrl+V", () => session.Paste());
-        Item("Duplicate", "Duplicate  Ctrl+D", session.Duplicate, selected.Count > 0);
+        Item("Copy", "Copy  Ctrl+C", () => ExecuteClipboardCommand(GraphClipboardCommand.Copy), selected.Count > 0);
+        Item("Cut", "Cut  Ctrl+X", () => ExecuteClipboardCommand(GraphClipboardCommand.Cut), selected.Count > 0);
+        Item("Paste", "Paste  Ctrl+V", () => ExecuteClipboardCommand(GraphClipboardCommand.Paste), session.CanPaste);
+        Item("PasteInPlace", "Paste in place  Ctrl+Shift+V", () => ExecuteClipboardCommand(GraphClipboardCommand.PasteInPlace), session.CanPaste);
+        Item("Duplicate", "Duplicate  Ctrl+D", () => ExecuteClipboardCommand(GraphClipboardCommand.Duplicate), selected.Count > 0);
         Item("Delete", "Delete  Del", session.DeleteSelection, selected.Count > 0);
         menu.Items.Add(new MenuFlyoutSeparator());
         Item("Group", "Group  Ctrl+G", session.Group, nodes.Length > 0 && nodes.All(n => n.ParentId == nodes[0].ParentId));

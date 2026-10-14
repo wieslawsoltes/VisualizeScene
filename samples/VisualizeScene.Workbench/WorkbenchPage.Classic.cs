@@ -31,8 +31,8 @@ public sealed partial class WorkbenchPage
         void Add(EditorIconKind kind, string id, string label, Action action) => row.Children.Add(IconButton(kind, id, label, action));
         Add(EditorIconKind.New, "New", "New graph", () => _ = NewGraph()); Add(EditorIconKind.Open, "Open", "Open graph", () => _ = RunAsync(OpenFile)); Add(EditorIconKind.Save, "Save", "Save graph", () => _ = Save("json"));
         row.Children.Add(Separator()); Add(EditorIconKind.Undo, "Undo", "Undo · Ctrl+Z", document.Undo); Add(EditorIconKind.Redo, "Redo", "Redo · Ctrl+Y", document.Redo);
-        row.Children.Add(Separator()); Add(EditorIconKind.Cut, "Cut", "Cut · Ctrl+X", () => { graph.Session.Copy(); graph.Session.DeleteSelection(); });
-        Add(EditorIconKind.Copy, "Copy", "Copy · Ctrl+C", () => graph.Session.Copy()); Add(EditorIconKind.Paste, "Paste", "Paste · Ctrl+V", () => graph.Session.Paste()); Add(EditorIconKind.Delete, "Delete", "Delete selection", graph.Session.DeleteSelection);
+        row.Children.Add(Separator()); Add(EditorIconKind.Cut, "Cut", "Cut · Ctrl+X", () => graph.ExecuteClipboardCommand(GraphClipboardCommand.Cut));
+        Add(EditorIconKind.Copy, "Copy", "Copy · Ctrl+C", () => graph.ExecuteClipboardCommand(GraphClipboardCommand.Copy)); Add(EditorIconKind.Paste, "Paste", "Paste · Ctrl+V", () => graph.ExecuteClipboardCommand(GraphClipboardCommand.Paste)); Add(EditorIconKind.Delete, "Delete", "Delete selection", graph.Session.DeleteSelection);
         row.Children.Add(Separator());
         foreach (var (mode, icon, id, text) in new[] { (EditorMode.Select, EditorIconKind.Select, "ModeSelect", "Select"), (EditorMode.CreateNode, EditorIconKind.Node, "ModeNode", "Create node"), (EditorMode.CreateEdge, EditorIconKind.Edge, "ModeEdge", "Create edge"), (EditorMode.Pan, EditorIconKind.Pan, "ModePan", "Pan") })
         { var button = IconButton(icon, id, text, () => SetMode(mode)); modeButtons.Add(mode, button); row.Children.Add(button); }
