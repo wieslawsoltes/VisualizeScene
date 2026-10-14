@@ -52,6 +52,9 @@ with sync_playwright() as p:
         click('ModeSelect');page.mouse.click(*point(ident));wait('v.selection.length===1 && v.selection[0]==='+json.dumps(ident))
     def undo(expected):
         revision=state()['revision'];click('Undo');wait('v.revision==='+str(revision+1));assert state()['model']==expected
+        # Undo retains native toolbar focus. Restore graph focus through the
+        # public selection tool before exercising graph-focused shortcuts.
+        click('ModeSelect');wait('v.graphFocused')
     def last_node(text,x,y):
         node=state()['model']['Graph']['Nodes'][-1];assert node['Text']==text and node['Bounds']['X']==x and node['Bounds']['Y']==y,node
     def record(name):
