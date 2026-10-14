@@ -20,7 +20,7 @@ public sealed partial class GraphControl : ContentControl, IDisposable
         {
             if (owner.disposed) return;
             var s = owner.Session;
-            owner.renderer.Render(canvas, s.DisplayGraph, s.Viewport, area.Width, area.Height, new(s.ShowGrid, s.GridSize, s.DisplaySelection, s.Marquee, s.EdgePreview, CandidatePosition: s.CandidatePosition, IsValidConnection: s.CandidateDecision.Allowed, AlignmentGuides: s.AlignmentGuides, MarqueeContains: s.IsMarqueeContainment, FocusBounds: owner.showKeyboardFocus && owner.FocusState != FocusState.Unfocused ? s.FocusedItemBounds : null));
+            owner.renderer.Render(canvas, s.DisplayGraph, s.Viewport, area.Width, area.Height, new(s.ShowGrid, s.GridSize, s.DisplaySelection, s.Marquee, s.EdgePreview, CandidatePosition: s.CandidatePosition, IsValidConnection: s.CandidateDecision.Allowed, AlignmentGuides: s.AlignmentGuides, MarqueeContains: s.IsMarqueeContainment, FocusBounds: owner.showKeyboardFocus && owner.FocusState != FocusState.Unfocused ? s.FocusedItemBounds : null) { GridSettings = s.GridSettings });
             owner.FrameRendered?.Invoke(owner, EventArgs.Empty);
         }
     }
@@ -41,7 +41,7 @@ public sealed partial class GraphControl : ContentControl, IDisposable
         set
         {
             ObjectDisposedException.ThrowIf(disposed, this); ArgumentNullException.ThrowIfNull(value); if (ReferenceEquals(document, value)) return;
-            var previous = document; CloseGraphContextMenu(); CancelTouchNavigation(); Session.Dispose(); document = value; Session = new(value); Attach();
+            var previous = document; var grid = Session.GridSettings; CloseGraphContextMenu(); CancelTouchNavigation(); Session.Dispose(); document = value; Session = new(value) { GridSettings = grid }; Attach();
             DocumentChanged?.Invoke(this, new(previous, value)); Invalidate();
         }
     }

@@ -36,7 +36,7 @@ public sealed partial class WorkbenchPage
             if (id is null) { status.Text = "Select a node first."; return; }
             var node = index.Nodes[id]; graph.Session.AddPort(id, new(node.Bounds.Right, node.Bounds.Center.Y));
         }, "AddPort");
-        var view = Menu("View"); Item(view, "Fit graph  Home", graph.Fit); Item(view, "Zoom in", () => graph.Zoom(1.25)); Item(view, "Zoom out", () => graph.Zoom(.8)); Item(view, "Toggle grid", () => { graph.Session.ShowGrid = !graph.Session.ShowGrid; graph.Invalidate(); }); Item(view, "Toggle grid snapping", () => graph.Session.SnapToGrid = !graph.Session.SnapToGrid, "ToggleGridSnap");
+        var view = Menu("View"); Item(view, "Fit graph  Home", graph.Fit); Item(view, "Zoom in", () => graph.Zoom(1.25)); Item(view, "Zoom out", () => graph.Zoom(.8)); AddGridMenu(view);
         var snapItems = new ToggleMenuFlyoutItem { Text = "Alignment guides", IsChecked = graph.Session.SnapToItems };
         Register("ToggleItemSnap", snapItems); snapItems.Click += (_, _) => graph.Session.SnapToItems = snapItems.IsChecked; view.Items.Add(snapItems);
         AddNavigationMenu(view); AddRenderingMenu(view);
