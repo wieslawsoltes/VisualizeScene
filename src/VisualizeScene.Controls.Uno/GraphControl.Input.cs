@@ -131,10 +131,11 @@ public sealed partial class GraphControl
                 case VirtualKey.A when control && shift: Session.ClearSelection(); break;
                 case VirtualKey.I when control: Session.InvertSelection(); break;
                 case VirtualKey.A when control: Session.SelectAll(); break;
-                case VirtualKey.C when control: Session.Copy(); break;
-                case VirtualKey.X when control: Session.Copy(); Session.DeleteSelection(); break;
-                case VirtualKey.V when control: Session.Paste(); break;
-                case VirtualKey.D when control: Session.Duplicate(); break;
+                case VirtualKey.C when control: case VirtualKey.Insert when control: ExecuteClipboardCommand(GraphClipboardCommand.Copy); break;
+                case VirtualKey.X when control: case VirtualKey.Delete when shift: ExecuteClipboardCommand(GraphClipboardCommand.Cut); break;
+                case VirtualKey.V when control && shift: ExecuteClipboardCommand(GraphClipboardCommand.PasteInPlace); break;
+                case VirtualKey.V when control: case VirtualKey.Insert when shift: ExecuteClipboardCommand(GraphClipboardCommand.Paste); break;
+                case VirtualKey.D when control: ExecuteClipboardCommand(GraphClipboardCommand.Duplicate); break;
                 case VirtualKey.Z when control && shift: Document.Redo(); break;
                 case VirtualKey.Z when control: Document.Undo(); break;
                 case VirtualKey.Y when control: Document.Redo(); break;

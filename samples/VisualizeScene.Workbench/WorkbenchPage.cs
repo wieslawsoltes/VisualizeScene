@@ -51,6 +51,7 @@ public sealed partial class WorkbenchPage : Page
         footer.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         footer.Children.Add(status); modeText.Margin = new(18, 0, 18, 0); Grid.SetColumn(modeText, 1); footer.Children.Add(modeText); Grid.SetColumn(counts, 2); footer.Children.Add(counts); Grid.SetRow(footer, 3); root.Children.Add(footer); Content = root;
         document.Changed += (_, args) => { status.Text = args.Operation; UpdateStatus(); PublishTestState(); };
+        graph.ClipboardChanged += (_, _) => { UpdateCommandAvailability(); PublishTestState(); PublishWorkspaceState(); };
         graph.SelectionChanged += (_, _) => { UpdateStatus(); PublishTestState(); };
         graph.Error += (_, text) => Report(text); graph.StatusChanged += (_, text) => status.Text = text;
         graph.FrameRendered += (_, _) => { frameCount++; UpdateChrome(); PublishTestState(); };
@@ -84,6 +85,7 @@ public sealed partial class WorkbenchPage : Page
     }
     private void UpdateCommandAvailability()
     {
+        UpdateClipboardCommands();
         if (testControls.GetValueOrDefault("Undo") is Control undo) undo.IsEnabled = document.CanUndo;
         if (testControls.GetValueOrDefault("Redo") is Control redo) redo.IsEnabled = document.CanRedo;
         var selected = graph.Session.Selection.Count > 0;
