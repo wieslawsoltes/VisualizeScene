@@ -75,28 +75,4 @@ public sealed partial class EditorSession
         }
     }
 
-    private bool CopyLabelsOnly()
-    {
-        labelClipboard = [];
-        if (selection.Count == 0 || selection.Any(id => !index.Labels.ContainsKey(id))) return false;
-        labelClipboard = selection.Select(id => index.Labels[id]).ToImmutableArray(); return true;
-    }
-
-    private void PasteLabels(IReadOnlyList<GraphLabel> labels, bool keepOwners = false)
-    {
-        var owners = selection.Where(id => index.Nodes.ContainsKey(id) || index.Edges.ContainsKey(id) || index.Ports.ContainsKey(id)).ToArray();
-        var target = !keepOwners && owners.Length == 1 ? owners[0] : null;
-        var created = new List<string>();
-        Document.Edit("Paste labels", edit =>
-        {
-            foreach (var label in labels)
-            {
-                var owner = target ?? label.OwnerId;
-                if (!GraphScene.IsOwnerVisible(index, owner)) throw new InvalidOperationException("Select an owner before pasting these labels.");
-                var id = GraphEdit.NewId("l"); created.Add(id);
-                edit.Add(label with { Id = id, OwnerId = owner, Offset = label.Offset + new PointD(30, 30) });
-            }
-        });
-        Select(created);
-    }
 }

@@ -186,23 +186,6 @@ public sealed partial class EditorSession : IDisposable
     {
         var ids = selection.ToArray(); Document.Edit("Delete selection", edit => edit.RemoveRange(ids)); Select([]);
     }
-    public GraphSnapshot Copy()
-    {
-        CopyLabelsOnly(); clipboard = GraphClipboard.Copy(Document.Snapshot, selection); return clipboard;
-    }
-    public void Paste(GraphSnapshot? data = null)
-    {
-        if (data is null && !labelClipboard.IsDefaultOrEmpty) { PasteLabels(labelClipboard); return; }
-        data ??= clipboard; if (data is null) return;
-        IReadOnlyList<string> added = [];
-        Document.Edit("Paste", edit => added = GraphClipboard.Paste(edit, data, new(30, 30))); Select(added);
-    }
-    public void Duplicate()
-    {
-        if (selection.Count > 0 && selection.All(index.Labels.ContainsKey))
-            PasteLabels(selection.Select(id => index.Labels[id]).ToArray(), keepOwners: true);
-        else Paste(GraphClipboard.Copy(Document.Snapshot, selection));
-    }
     public void Group()
     {
         string id = ""; Document.Edit("Group nodes", edit => id = edit.Group(selection)); Select([id]);
